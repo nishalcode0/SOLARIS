@@ -8,6 +8,10 @@ import {
 
 import LunarTerrain3D from './components/LunarTerrain3D'
 
+import MissionTimeController from './components/MissionTimeController'
+
+import HorizonIntelligence from './components/HorizonIntelligence'
+
 import {
   calculateEarthVisibility,
   type EarthVisibilityAnalysis,
@@ -349,14 +353,7 @@ export default function App() {
     }
   }, [selectedSite])
 
- const simulationTimeInput = useMemo(() => {
-  const localTime = new Date(
-    simulationTime.getTime() -
-    simulationTime.getTimezoneOffset() * 60000,
-  )
 
-  return localTime.toISOString().slice(0, 16)
-}, [simulationTime])
 
 const liveSolarPosition = useMemo(() => {
   if (!selectedSite) return null
@@ -1321,24 +1318,54 @@ useEffect(() => {
           )}
 
           </div>
-) : (
- <div className="map-viewport terrain-3d-viewport">
-  {terrainFocus && (
-    <LunarTerrain3D
-      latitude={terrainFocus.latitude}
-      longitude={terrainFocus.longitude}
-    />
-  )}
-
-  <button
-    className="terrain-exit-button"
-    onClick={() => setViewMode('2d')}
+        
+        ) : (
+  <div
+    className="map-viewport terrain-3d-viewport"
+    style={{
+      position: 'relative',
+      height: '100%',
+      minHeight: '600px',
+      overflow: 'hidden',
+    }}
   >
-    ← 2D MAP
-  </button>
-</div>
-)}
+    {terrainFocus && (
+      <LunarTerrain3D
+        latitude={terrainFocus.latitude}
+        longitude={terrainFocus.longitude}
+        simulationTime={simulationTime}
+      />
+    )}
 
+    {/* MIDDLE-LEFT MISSION TIME CONTROLLER */}
+    {selectedSite && (
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '0',
+          transform: 'translateY(-50%)',
+          zIndex: 999,
+          width: '280px',
+          maxWidth: 'calc(100% - 16px)',
+        }}
+      >
+        <MissionTimeController
+          simulationTime={simulationTime}
+          onTimeChange={setSimulationTime}
+          compact
+        />
+      </div>
+    )}
+
+    <button
+      className="terrain-exit-button"
+      onClick={() => setViewMode('2d')}
+    >
+      ← 2D MAP
+    </button>
+  </div>
+)}
         {/* ========================================
             LEFT MAP SIDEBAR
         ======================================== */}
@@ -1732,200 +1759,18 @@ useEffect(() => {
   </p>
 </section>
 
-<section className="horizon-panel">
-
-  <div className="horizon-header">
-    <div>
-      <span className="section-eyebrow">
-        NASA LOLA · TERRAIN ANALYSIS
-      </span>
-
-      <h3>360° Terrain Horizon</h3>
-    </div>
-
-    <span className="data-status">
-      {horizonLoading
-        ? 'SAMPLING'
-        : horizonError
-          ? 'ERROR'
-          : terrainHorizon
-            ? 'DEM PROFILE'
-            : 'NO DATA'}
-    </span>
-  </div>
-
-  {horizonLoading && (
-    <p className="horizon-message">
-      Sampling terrain in 72 compass directions...
-    </p>
-  )}
-
-  {horizonError && (
-    <p className="horizon-error">
-      {horizonError}
-    </p>
-  )}
-
-  {terrainHorizon && (
-    <>
-      <div className="horizon-chart">
-
-        <div className="horizon-chart-label">
-          HORIZON ELEVATION ANGLE
-        </div>
-
-        <svg
-          viewBox="0 0 360 110"
-          role="img"
-          aria-label="Terrain horizon elevation by compass bearing"
-          preserveAspectRatio="none"
-        >
-          {[0, 90, 180, 270, 360].map((angle) => (
-            <g key={angle}>
-              <line
-                x1={angle}
-                y1="8"
-                x2={angle}
-                y2="88"
-                className="horizon-grid-line"
-              />
-
-              <text
-                x={angle === 360 ? 356 : angle}
-                y="105"
-                textAnchor={angle === 0 ? 'start' : angle === 360 ? 'end' : 'middle'}
-                className="horizon-axis-label"
-              >
-                {angle === 360 ? 'N' : `${angle}°`}
-              </text>
-            </g>
-          ))}
-
-          {[0, 30, 60].map((y) => (
-            <line
-              key={y}
-              x1="0"
-              y1={y + 8}
-              x2="360"
-              y2={y + 8}
-              className="horizon-grid-line"
-            />
-          ))}
-
-          <line
-            x1="0"
-            y1="88"
-            x2="360"
-            y2="88"
-            className="horizon-baseline"
-          />
-
-          {terrainHorizon.bins.map((bin) => {
-            if (!Number.isFinite(bin.horizonElevationDeg)) {
-              return null
-            }
-
-            const angle = Math.max(
-              -10,
-              Math.min(30, bin.horizonElevationDeg),
-            )
-
-            const y = 88 - ((angle + 10) / 40) * 80
-
-            return (
-              <line
-                key={bin.azimuthDeg}
-                x1={bin.azimuthDeg}
-                y1="88"
-                x2={bin.azimuthDeg}
-                y2={y}
-                className="horizon-bar"
-              />
-            )
-          })}
-        </svg>
-
-        <div className="horizon-chart-scale">
-          <span>−10°</span>
-          <span>0°</span>
-          <span>+10°</span>
-          <span>+20°</span>
-          <span>+30°</span>
-        </div>
-
-      </div>
-
-      <div className="horizon-stats">
-
-        <div>
-          <span>DIRECTIONS</span>
-          <strong>{terrainHorizon.bins.length}</strong>
-        </div>
-
-        <div>
-          <span>MAX RANGE</span>
-          <strong>
-            {(terrainHorizon.maxDistanceM / 1000).toFixed(0)} km
-          </strong>
-        </div>
-
-        <div>
-          <span>DEM COVERAGE</span>
-          <strong>
-            {terrainHorizon.coveragePercent.toFixed(1)}%
-          </strong>
-        </div>
-
-      </div>
-
-      <div className="horizon-quality">
-
-        <div>
-          <span>VALID TERRAIN SAMPLES</span>
-          <strong>
-            {terrainHorizon.validSamples.toLocaleString()}
-          </strong>
-        </div>
-
-        <div>
-          <span>MISSING SAMPLES</span>
-          <strong>
-            {terrainHorizon.missingSamples.toLocaleString()}
-          </strong>
-        </div>
-
-        <div>
-          <span>SAMPLE SPACING</span>
-          <strong>
-            {terrainHorizon.sampleStepM} m
-          </strong>
-        </div>
-
-        <div>
-          <span>ANGULAR SPACING</span>
-          <strong>
-            {terrainHorizon.azimuthStepDeg}°
-          </strong>
-        </div>
-
-      </div>
-
-      <div className="horizon-disclaimer">
-        <strong>MODEL LIMITATIONS</strong>
-
-        <p>
-          DEM-derived terrain horizon using sampled LOLA
-          elevations and spherical lunar geometry. Small
-          features between samples may be missed. Results
-          are limited by DEM coverage and effective
-          resolution; they are not a certified visibility
-          or landing-safety assessment.
-        </p>
-      </div>
-    </>
-  )}
-
-</section>
+{selectedSite && (
+  <HorizonIntelligence
+    latitude={selectedSite.latitude}
+    longitude={selectedSite.longitude}
+    simulationTime={simulationTime}
+    profile={terrainHorizon}
+    solar={liveSolarPosition}
+    earth={communicationsAnalysis}
+    loading={horizonLoading}
+    error={horizonError}
+  />
+)}
   
 <section className="communications-panel">
 
@@ -2063,57 +1908,13 @@ useEffect(() => {
             : 'NO DATA'}
     </span>
   </div>
-          {selectedSite && (
-    <div className="solar-time-controls">
-      <span className="section-eyebrow">
-        SIMULATION TIME · LOCAL TIME
-      </span>
-
-      <input
-        type="datetime-local"
-        value={simulationTimeInput}
-        onChange={(event) => {
-          if (!event.target.value) return
-
-          const nextTime = new Date(event.target.value)
-
-          if (!Number.isNaN(nextTime.getTime())) {
-            setSimulationTime(nextTime)
-          }
-        }}
-      />
-
-      <div className="solar-time-buttons">
-        <button
-          onClick={() =>
-            setSimulationTime(
-              (previous) =>
-                new Date(previous.getTime() - 60 * 60 * 1000),
-            )
-          }
-        >
-          − 1 HOUR
-        </button>
-
-        <button
-          onClick={() => setSimulationTime(new Date())}
-        >
-          NOW
-        </button>
-
-        <button
-          onClick={() =>
-            setSimulationTime(
-              (previous) =>
-                new Date(previous.getTime() + 60 * 60 * 1000),
-            )
-          }
-        >
-          + 1 HOUR
-        </button>
-      </div>
-    </div>
-  )}
+         
+         {selectedSite && (
+  <MissionTimeController
+    simulationTime={simulationTime}
+    onTimeChange={setSimulationTime}
+  />
+)}
   {illuminationLoading && (
     <p className="illumination-message">
       Calculating solar geometry across one lunar day...

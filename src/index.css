@@ -197,14 +197,10 @@ input:focus-visible {
 .map-viewport {
   position: absolute;
   inset: 0;
-
   overflow: hidden;
   isolation: isolate;
-
-  touch-action: none;
-
-  cursor: grab;
 }
+
 
 .map-viewport:active {
   cursor: grabbing;

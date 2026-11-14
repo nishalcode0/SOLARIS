@@ -4,6 +4,7 @@ import {
   type TerrainHorizonProfile,
 } from '../lib/lolaElevation'
 
+import './HorizonIntelligence.css'
 import type { SolarPositionSample } from '../lib/lunarIllumination'
 import type { EarthVisibilityAnalysis } from '../lib/lunarCommunications'
 

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 
+import { calculateSolarPosition } from '../lib/lunarIllumination'
 import { createTerrainTextures } from '../three/createTerrainTextures'
 import { loadTerrainPatch } from '../lib/lolaElevation'
 import { createTerrainMesh } from '../three/createTerrainMesh'
@@ -10,6 +11,7 @@ import { createLunarScene } from '../three/createLunarScene'
 interface LunarTerrain3DProps {
   latitude: number
   longitude: number
+  simulationTime: Date
 }
 
 function disposeMaterial(material: THREE.Material | THREE.Material[]) {
@@ -23,18 +25,29 @@ function disposeMaterial(material: THREE.Material | THREE.Material[]) {
 export default function LunarTerrain3D({
   latitude,
   longitude,
+  simulationTime,
 }: LunarTerrain3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
+
   const texturesRef = useRef<{
     elevation: THREE.DataTexture
     slope: THREE.DataTexture
   } | null>(null)
 
+  const lightingRef =
+    useRef<ReturnType<typeof createLunarScene>['lighting'] | null>(null)
+
+  // Always keep the latest simulation time available to scene initialization.
+  const simulationTimeRef = useRef(simulationTime)
+  simulationTimeRef.current = simulationTime
+
   const [status, setStatus] = useState('Loading lunar terrain...')
   const [error, setError] = useState<string | null>(null)
   const [slopeEnabled, setSlopeEnabled] = useState(false)
 
+  // Load and initialize the terrain scene when the selected location changes.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -45,7 +58,6 @@ export default function LunarTerrain3D({
     let lunarScene: ReturnType<typeof createLunarScene> | null = null
     let terrain: ReturnType<typeof createTerrainMesh> | null = null
     let resizeObserver: ResizeObserver | null = null
-
     let landingMarker: THREE.Group | null = null
 
     async function initialize() {
@@ -54,6 +66,20 @@ export default function LunarTerrain3D({
         setStatus('Loading NASA LOLA elevation data...')
 
         lunarScene = createLunarScene(container!)
+
+        lightingRef.current = lunarScene.lighting
+
+        // Set sunlight using the current mission simulation time.
+        const solar = calculateSolarPosition(
+          latitude,
+          longitude,
+          simulationTimeRef.current,
+        )
+
+        lunarScene.lighting.updateSun(
+          solar.solarAzimuthDeg,
+          solar.solarElevationDeg,
+        )
 
         const animate = () => {
           if (cancelled || !lunarScene) return
@@ -91,67 +117,67 @@ export default function LunarTerrain3D({
         const textures = createTerrainTextures(patch)
         texturesRef.current = textures
 
-     const material = new THREE.MeshStandardMaterial({
-  color: 0xb5b0a5,
-  map: null,
-  roughness: 0.96,
-  metalness: 0,
-  side: THREE.DoubleSide,
-})
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xb5b0a5,
+          map: null,
+          roughness: 0.96,
+          metalness: 0,
+          side: THREE.DoubleSide,
+        })
 
         materialRef.current = material
         terrain.mesh.material = material
 
         lunarScene.scene.add(terrain.mesh)
+
         // Create the selected landing-location marker.
-const centerIndex =
-  Math.floor(patch.height / 2) * patch.width +
-  Math.floor(patch.width / 2)
+        const centerIndex =
+          Math.floor(patch.height / 2) * patch.width +
+          Math.floor(patch.width / 2)
 
-const centerElevation = patch.elevations[centerIndex]
+        const centerElevation = patch.elevations[centerIndex]
 
-if (Number.isFinite(centerElevation)) {
-  landingMarker = new THREE.Group()
-  landingMarker.name = 'SELECTED_LANDING_SITE'
+        if (Number.isFinite(centerElevation)) {
+          landingMarker = new THREE.Group()
+          landingMarker.name = 'SELECTED_LANDING_SITE'
 
-  // Red circular landing-zone outline.
-  const ringGeometry = new THREE.RingGeometry(400, 480, 80)
+          const ringGeometry = new THREE.RingGeometry(400, 480, 80)
 
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff3030,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
+          const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3030,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
 
-  const ring = new THREE.Mesh(ringGeometry, ringMaterial)
-  ring.rotation.x = -Math.PI / 2
-  ring.position.y = 25
-  ring.renderOrder = 10
+          const ring = new THREE.Mesh(ringGeometry, ringMaterial)
+          ring.rotation.x = -Math.PI / 2
+          ring.position.y = 25
+          ring.renderOrder = 10
 
-  // Small red centre point.
-  const dotGeometry = new THREE.CircleGeometry(90, 32)
+          const dotGeometry = new THREE.CircleGeometry(90, 32)
 
-  const dotMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff3030,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
+          const dotMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3030,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
 
-  const dot = new THREE.Mesh(dotGeometry, dotMaterial)
-  dot.rotation.x = -Math.PI / 2
-  dot.position.y = 27
-  dot.renderOrder = 11
+          const dot = new THREE.Mesh(dotGeometry, dotMaterial)
+          dot.rotation.x = -Math.PI / 2
+          dot.position.y = 27
+          dot.renderOrder = 11
 
-  landingMarker.add(ring, dot)
+          landingMarker.add(ring, dot)
 
-  landingMarker.position.set(
-    0,
-    centerElevation * 2,
-    0,
-  )
+          landingMarker.position.set(
+            0,
+            centerElevation * 2,
+            0,
+          )
 
-  lunarScene.scene.add(landingMarker)
-}
+          lunarScene.scene.add(landingMarker)
+        }
+
         lunarScene.cameraRig.flyToSite()
 
         setStatus(
@@ -174,6 +200,7 @@ if (Number.isFinite(centerElevation)) {
 
     return () => {
       cancelled = true
+
       cancelAnimationFrame(animationFrame)
       resizeObserver?.disconnect()
 
@@ -183,42 +210,61 @@ if (Number.isFinite(centerElevation)) {
       }
 
       if (landingMarker) {
-  landingMarker.traverse((object) => {
-    if (object instanceof THREE.Mesh) {
-      object.geometry.dispose()
-      disposeMaterial(object.material)
-    }
-  })
+        landingMarker.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.geometry.dispose()
+            disposeMaterial(object.material)
+          }
+        })
 
-  landingMarker.removeFromParent()
-}
+        landingMarker.removeFromParent()
+      }
 
       texturesRef.current?.elevation.dispose()
       texturesRef.current?.slope.dispose()
       texturesRef.current = null
+
       materialRef.current = null
+      lightingRef.current = null
 
       lunarScene?.dispose()
     }
   }, [latitude, longitude])
 
+  // Update the 3D sunlight whenever mission simulation time changes.
+  useEffect(() => {
+    const lighting = lightingRef.current
+    if (!lighting) return
+
+    const solar = calculateSolarPosition(
+      latitude,
+      longitude,
+      simulationTime,
+    )
+
+    lighting.updateSun(
+      solar.solarAzimuthDeg,
+      solar.solarElevationDeg,
+    )
+  }, [latitude, longitude, simulationTime])
+
   // Switch between natural lunar grey and the optional slope heatmap.
-useEffect(() => {
-  const material = materialRef.current
-  const textures = texturesRef.current
+  useEffect(() => {
+    const material = materialRef.current
+    const textures = texturesRef.current
 
-  if (!material || !textures) return
+    if (!material || !textures) return
 
-  if (slopeEnabled) {
-    material.map = textures.slope
-    material.color.setHex(0xffffff)
-  } else {
-    material.map = null
-    material.color.setHex(0xb5b0a5)
-  }
+    if (slopeEnabled) {
+      material.map = textures.slope
+      material.color.setHex(0xffffff)
+    } else {
+      material.map = null
+      material.color.setHex(0xb5b0a5)
+    }
 
-  material.needsUpdate = true
-}, [slopeEnabled])
+    material.needsUpdate = true
+  }, [slopeEnabled])
 
   return (
     <div
