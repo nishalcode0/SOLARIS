@@ -2539,3 +2539,124 @@ input:focus-visible {
   overflow-wrap: anywhere;
   font-size: clamp(1.1rem, 4vw, 1.6rem);
 }
+
+
+/* =========================================
+   2D / 3D VIEW TOGGLE
+========================================= */
+
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid #c8c4bb;
+  border-radius: 7px;
+  background: #eeece5;
+  color: #343b45;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.view-toggle:hover:not(:disabled) {
+  border-color: #d98b60;
+  background: #f5e6dc;
+}
+
+.view-toggle.active {
+  background: #172d49;
+  border-color: #172d49;
+  color: #ffffff;
+}
+
+.view-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* =========================================
+   3D TERRAIN WORKSPACE
+========================================= */
+
+.terrain-3d-viewport {
+  overflow: hidden;
+  background: #171b20;
+  border-radius: 12px;
+}
+
+.terrain-3d-viewport > div {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+}
+/* SOLARIS — Full-screen 3D terrain mode */
+
+.map-workspace.terrain-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background: #171b20;
+}
+
+.map-workspace.terrain-mode .left-rail {
+  display: none !important;
+}
+
+.map-workspace.terrain-mode .inspection-panel {
+  display: none !important;
+}
+
+.map-workspace.terrain-mode .terrain-3d-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.map-workspace.terrain-mode .terrain-3d-viewport > div {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.terrain-exit-button {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  z-index: 20;
+  padding: 11px 17px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  background: rgba(23, 35, 52, .92);
+  color: #f4f0e8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.terrain-exit-button:hover {
+  background: #29496d;
+}

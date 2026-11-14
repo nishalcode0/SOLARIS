@@ -6,6 +6,8 @@ import {
   useState,
 } from 'react'
 
+import LunarTerrain3D from './components/LunarTerrain3D'
+
 import {
   calculateEarthVisibility,
   type EarthVisibilityAnalysis,
@@ -233,6 +235,12 @@ export default function App() {
   const [selectedSite, setSelectedSite] =
     useState<Selection | null>(null)
 
+  const [terrainFocus, setTerrainFocus] =
+    useState<Point | null>(null)
+
+  const [reportOpen, setReportOpen] =
+    useState(true)
+
   // Map navigation.
   // No pan state: the South Pole remains centred.
 
@@ -240,6 +248,9 @@ export default function App() {
 
   const [hillshadeOn, setHillshadeOn] =
     useState(true)
+
+  const [viewMode, setViewMode] =
+    useState<'2d' | '3d'>('2d')
 
   const [slopeHeatmapOn, setSlopeHeatmapOn] =
     useState(false)  
@@ -665,18 +676,24 @@ useEffect(() => {
     setSelectedSite(null)
   }
 
-  function landHere() {
-    if (!pendingSite) return
+ function landHere() {
+  if (!pendingSite) return
 
-    setSelectedSite(pendingSite)
-    setPendingSite(null)
-    setExpanded(false)
-  }
+  setSelectedSite(pendingSite)
 
+  setTerrainFocus({
+    latitude: pendingSite.latitude,
+    longitude: pendingSite.longitude,
+  })
+
+  setPendingSite(null)
+  setExpanded(false)
+  setReportOpen(true)
+}
   function closeInspection() {
-    setSelectedSite(null)
-    setExpanded(false)
-  }
+  setReportOpen(false)
+  setExpanded(false)
+}
   
   // ------------------------------------------------
   // MAP INTERACTION
@@ -814,12 +831,26 @@ useEffect(() => {
         </div>
 
         <div className="top-right">
-          <span>MOON · LUNA</span>
 
-          <span className="top-separator" />
+  <button
+    className={`view-toggle ${viewMode === '2d' ? 'active' : ''}`}
+    onClick={() => setViewMode('2d')}
+  >
+    <MapIcon size={14} />
+    2D MAP
+  </button>
 
-          <span>70°S — 90°S</span>
-        </div>
+  <button
+    className={`view-toggle ${viewMode === '3d' ? 'active' : ''}`}
+    onClick={() => setViewMode('3d')}
+    disabled={!selectedPoint}
+    title={!selectedPoint ? 'Select a location first' : 'Open 3D terrain'}
+  >
+    <Move3D size={14} />
+    3D TERRAIN
+  </button>
+
+</div>
 
       </header>
 
@@ -827,8 +858,9 @@ useEffect(() => {
           MAP WORKSPACE
       ========================================== */}
 
-      <section className="map-workspace">
+     <section className={`map-workspace ${viewMode === '3d' ? 'terrain-mode' : ''}`}>
 
+        {viewMode === '2d' ? (
         <div
           className="map-viewport"
           ref={viewportRef}
@@ -1288,7 +1320,24 @@ useEffect(() => {
             </div>
           )}
 
-        </div>
+          </div>
+) : (
+ <div className="map-viewport terrain-3d-viewport">
+  {terrainFocus && (
+    <LunarTerrain3D
+      latitude={terrainFocus.latitude}
+      longitude={terrainFocus.longitude}
+    />
+  )}
+
+  <button
+    className="terrain-exit-button"
+    onClick={() => setViewMode('2d')}
+  >
+    ← 2D MAP
+  </button>
+</div>
+)}
 
         {/* ========================================
             LEFT MAP SIDEBAR
@@ -1455,12 +1504,12 @@ useEffect(() => {
             FLOATING INSPECTION PANEL
         ======================================== */}
 
-        {selectedSite && selectedPoint && (
-          <aside
-            className={`inspection-panel ${
-              expanded ? 'expanded' : ''
-            }`}
-          >
+        {reportOpen && selectedSite && selectedPoint && (
+  <aside
+    className={`inspection-panel ${
+      expanded ? 'expanded' : ''
+    }`}
+  >
 
             <div className="inspection-head">
 

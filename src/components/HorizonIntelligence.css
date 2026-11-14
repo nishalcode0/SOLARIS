@@ -1,0 +1,152 @@
+
+.horizon-intelligence {
+  color: #263746;
+  background: #f4f0e7;
+  border: 1px solid #d9d3c8;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.horizon-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.horizon-eyebrow,
+.readout-label {
+  display: block;
+  color: #77838b;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+}
+
+.horizon-header h2 {
+  margin: 6px 0;
+  color: #18334d;
+  font-size: 21px;
+}
+
+.horizon-header p {
+  color: #77838b;
+  font-size: 12px;
+  margin: 0;
+}
+
+.horizon-live-indicator {
+  color: #1d685e;
+  border: 1px solid #a9c9bd;
+  border-radius: 20px;
+  padding: 5px 9px;
+  font-size: 9px;
+  letter-spacing: 0.7px;
+  white-space: nowrap;
+}
+
+.horizon-chart-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 18px auto 8px;
+  max-width: 340px;
+}
+
+.horizon-chart {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.horizon-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #66737c;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.horizon-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.horizon-legend i {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+.legend-terrain { background: #f09a60; }
+.legend-sun { background: #e6ad36; }
+.legend-earth { background: #64a8d8; }
+
+.horizon-readouts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.horizon-readouts article {
+  background: #eae6dc;
+  border: 1px solid #d8d2c7;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.horizon-readouts strong {
+  display: block;
+  color: #18334d;
+  font-size: 25px;
+  margin: 5px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.horizon-readouts small {
+  display: block;
+  color: #697780;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.horizon-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid #d9d3c8;
+  padding-top: 12px;
+  margin-top: 15px;
+  color: #697780;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.horizon-location {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #849097;
+  font-size: 9px;
+}
+
+.horizon-message,
+.horizon-error {
+  padding: 16px 0;
+  color: #697780;
+  font-size: 12px;
+}
+
+.horizon-error {
+  color: #a74738;
+}
