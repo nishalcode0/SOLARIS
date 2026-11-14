@@ -1,0 +1,27 @@
+{
+  "source": "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_80S_80MPP_ADJ_HILL.TIF",
+  "product": "LDEM_80S_80MPP_ADJ_HILL.TIF",
+  "provider": "NASA Goddard Space Flight Center PGDA",
+  "instrument": "Lunar Orbiter Laser Altimeter (LOLA)",
+  "coverage": "80\u00b0S to 90\u00b0S",
+  "source_pixel_scale_m": 80,
+  "source_crs": "PROJCS[\"Moon (2015) - Sphere / Ocentric / South Polar\",GEOGCS[\"Moon (2015) - Sphere / Ocentric\",DATUM[\"Moon (2015) - Sphere\",SPHEROID[\"Moon (2015) - Sphere\",1737400,0,AUTHORITY[\"IAU\",\"30100\"]],AUTHORITY[\"IAU\",\"30100\"]],PRIMEM[\"Reference Meridian\",0,AUTHORITY[\"IAU\",\"30100\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"IAU\",\"30100\"]],PROJECTION[\"Polar_Stereographic\"],PARAMETER[\"latitude_of_origin\",-90],PARAMETER[\"central_meridian\",0],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",NORTH],AXIS[\"Northing\",NORTH],AUTHORITY[\"IAU\",\"30135\"]]",
+  "reference_frame": "MOON_ME / JPL DE421 (per NASA product documentation)",
+  "image_width": 2400,
+  "image_height": 2400,
+  "bounds_m": {
+    "left": -304000.0,
+    "bottom": -304000.0,
+    "right": 304000.0,
+    "top": 304000.0
+  },
+  "transform": [
+    253.33333333333331,
+    0.0,
+    -304000.0,
+    0.0,
+    -253.33333333333331,
+    304000.0
+  ],
+  "note": "Hillshade is terrain visualization, not raw elevation values."
+}

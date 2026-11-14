@@ -1,0 +1,1707 @@
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ================================================
+   1. DESIGN SYSTEM
+================================================ */
+
+:root {
+  font-family: 'DM Sans', Arial, sans-serif;
+
+  color: #252b30;
+  background: #e9e8e2;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+
+  --ink: #252b30;
+  --muted: #727a7d;
+
+  --line: #d1d3cd;
+  --paper: #f3f1e9;
+  --panel: #faf9f5;
+
+  --red: #c94d43;
+  --teal: #397d78;
+
+  --mono: 'DM Mono', monospace;
+}
+
+/* ================================================
+   2. GLOBAL RESET
+================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--paper);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* ================================================
+   3. APPLICATION LAYOUT
+================================================ */
+
+.selene-app {
+  width: 100%;
+  height: 100dvh;
+  min-height: 540px;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: var(--paper);
+}
+
+/* ================================================
+   4. HEADER
+================================================ */
+
+.topbar {
+  z-index: 10;
+
+  height: 62px;
+  flex: 0 0 62px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+  padding: 0 22px;
+
+  color: #f6f5ef;
+
+  background: var(--ink);
+
+  border-bottom: 2px solid var(--red);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  min-width: 230px;
+}
+
+.brand-mark {
+  width: 35px;
+  height: 35px;
+
+  display: grid;
+  place-items: center;
+
+  color: #e47768;
+
+  border: 1px solid #596168;
+  border-radius: 5px;
+}
+
+.brand-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.brand-name span {
+  color: #e47768;
+}
+
+.brand-caption {
+  margin-top: 3px;
+
+  color: #b8c0bd;
+
+  font: 7px var(--mono);
+  letter-spacing: 1.25px;
+}
+
+.top-center,
+.top-right {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  color: #d0d5d1;
+
+  font: 8px var(--mono);
+  letter-spacing: 0.8px;
+}
+
+.live-square {
+  width: 6px;
+  height: 6px;
+
+  background: #76a59b;
+}
+
+.top-divider,
+.top-separator {
+  color: #76817e;
+}
+
+.top-right {
+  justify-content: flex-end;
+  min-width: 190px;
+}
+
+/* ================================================
+   5. MAP WORKSPACE
+================================================ */
+
+.map-workspace {
+  position: relative;
+
+  flex: 1;
+  min-height: 0;
+
+  overflow: hidden;
+
+  background: #e8e9e4;
+}
+
+.map-viewport {
+  position: absolute;
+  inset: 0;
+
+  overflow: hidden;
+  isolation: isolate;
+
+  touch-action: none;
+
+  cursor: grab;
+}
+
+.map-viewport:active {
+  cursor: grabbing;
+}
+
+.map-viewport:fullscreen {
+  background: #e8e9e4;
+}
+
+.map-background-grid {
+  position: absolute;
+  inset: 0;
+
+  background-image:
+    linear-gradient(
+      rgba(45, 55, 58, 0.055) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(45, 55, 58, 0.055) 1px,
+      transparent 1px
+    );
+
+  background-size: 42px 42px;
+}
+
+/* ================================================
+   6. POLAR MAP
+================================================ */
+
+.map-content {
+  position: absolute;
+  inset: 0;
+
+  display: grid;
+  place-items: center;
+
+  transform-origin: center;
+
+  will-change: transform;
+}
+
+.polar-map {
+  position: relative;
+
+  width: min(min(88vh, 88vw), 850px);
+  max-width: 90%;
+
+  aspect-ratio: 1;
+
+  overflow: visible;
+
+  border: 1px solid rgba(69, 79, 79, 0.35);
+  border-radius: 50%;
+
+  background: radial-gradient(
+    circle,
+    #d8dbd5 0%,
+    #e2e4de 100%
+  );
+
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 10px 35px rgba(30, 38, 38, 0.08);
+}
+
+/* ================================================
+   7. NASA HILLSHADE
+================================================ */
+
+.hillshade-raster {
+  position: absolute;
+  z-index: 1;
+
+  width: 48.9%;
+  height: 48.9%;
+
+  left: 50%;
+  top: 50%;
+
+  transform: translate(-50%, -50%);
+
+  object-fit: cover;
+
+  border-radius: 50%;
+
+  opacity: 0.96;
+
+  border: 1px solid rgba(43, 51, 52, 0.42);
+
+  pointer-events: none;
+}
+
+.raster-error {
+  position: absolute;
+  z-index: 4;
+
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  padding: 10px;
+
+  color: var(--red);
+
+  background: var(--panel);
+
+  border: 1px solid var(--line);
+
+  font: 9px var(--mono);
+  text-align: center;
+}
+
+/* ================================================
+   8. COORDINATE GRID
+================================================ */
+
+.map-grid-svg {
+  position: absolute;
+  z-index: 2;
+
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  overflow: visible;
+
+  pointer-events: none;
+}
+
+.latitude-ring {
+  fill: none;
+
+  stroke: rgba(47, 57, 59, 0.35);
+  stroke-width: 0.15;
+
+  stroke-dasharray: 0.7 0.7;
+
+  vector-effect: non-scaling-stroke;
+}
+
+.coverage-ring {
+  fill: none;
+
+  stroke: rgba(201, 77, 67, 0.85);
+  stroke-width: 0.28;
+
+  stroke-dasharray: 1.1 0.65;
+
+  vector-effect: non-scaling-stroke;
+}
+
+.longitude-line {
+  stroke: rgba(47, 57, 59, 0.28);
+
+  stroke-width: 0.13;
+  stroke-dasharray: 0.8 0.8;
+
+  vector-effect: non-scaling-stroke;
+}
+
+.map-label {
+  fill: #fff;
+
+  stroke: rgba(35, 43, 46, 0.82);
+  stroke-width: 0.65px;
+
+  paint-order: stroke;
+  stroke-linejoin: round;
+
+  font: 1.55px var(--mono);
+}
+
+.pole-dot {
+  fill: var(--red);
+
+  stroke: white;
+  stroke-width: 0.35;
+
+  vector-effect: non-scaling-stroke;
+}
+
+.pole-text {
+  font-size: 1.35px;
+}
+
+/* ================================================
+   9. CANDIDATE LOCATION MARKERS
+================================================ */
+
+.candidate-pin {
+  position: absolute;
+  z-index: 4;
+
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  transform: translate(-50%, -50%);
+
+  white-space: nowrap;
+}
+
+.candidate-pin i {
+  width: 9px;
+  height: 9px;
+
+  display: block;
+
+  border: 2px solid white;
+  border-radius: 50%;
+
+  background: var(--teal);
+
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.candidate-pin span {
+  padding: 4px 6px;
+
+  color: white;
+
+  background: var(--ink);
+
+  border-radius: 2px;
+
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.candidate-pin:hover i {
+  background: var(--red);
+}
+
+/* ================================================
+   10. SELECTED LOCATION MARKERS
+================================================ */
+
+.pending-marker,
+.committed-marker {
+  position: absolute;
+  z-index: 5;
+
+  width: 20px;
+  height: 20px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--red);
+  border-radius: 50%;
+
+  transform: translate(-50%, -50%);
+
+  pointer-events: none;
+}
+
+.pending-marker i,
+.committed-marker i {
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background: var(--red);
+}
+
+/* ================================================
+   11. MAP INFORMATION CARDS
+================================================ */
+
+.map-top-left,
+.map-top-right,
+.map-bottom-left {
+  position: absolute;
+  z-index: 6;
+
+  min-width: 170px;
+
+  padding: 10px 12px;
+
+  background: rgba(250, 249, 245, 0.94);
+
+  border: 1px solid #d0d3cc;
+  border-radius: 4px;
+
+  pointer-events: none;
+}
+
+.map-top-left {
+  top: 16px;
+  left: 16px;
+}
+
+.map-top-right {
+  top: 16px;
+  right: 16px;
+
+  text-align: right;
+}
+
+.map-bottom-left {
+  bottom: 16px;
+  left: 16px;
+}
+
+.eyebrow {
+  color: var(--teal);
+
+  font: 8px var(--mono);
+  font-weight: 500;
+
+  letter-spacing: 0.85px;
+}
+
+.map-top-left strong,
+.map-top-right strong,
+.map-bottom-left strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: var(--ink);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.map-top-left small,
+.map-top-right small,
+.map-bottom-left small {
+  display: block;
+
+  margin-top: 4px;
+
+  color: var(--muted);
+
+  font: 7px var(--mono);
+  letter-spacing: 0.25px;
+}
+
+/* ================================================
+   12. MAP CONTROLS
+================================================ */
+
+.map-controls {
+  position: absolute;
+  z-index: 7;
+
+  right: 17px;
+  bottom: 17px;
+
+  display: grid;
+  gap: 5px;
+}
+
+.map-controls button,
+.inspection-actions button {
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  color: var(--ink);
+
+  background: var(--panel);
+
+  border: 1px solid #cbd0ca;
+  border-radius: 4px;
+}
+
+.map-controls button:hover,
+.inspection-actions button:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.zoom-label {
+  position: absolute;
+  z-index: 6;
+
+  right: 60px;
+  bottom: 22px;
+
+  padding: 5px 7px;
+
+  color: var(--ink);
+
+  background: rgba(250, 249, 245, 0.94);
+
+  border: 1px solid #cbd0ca;
+  border-radius: 3px;
+
+  font: 8px var(--mono);
+}
+
+.map-help {
+  position: absolute;
+  z-index: 6;
+
+  right: 17px;
+  top: 65px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+
+  color: #657073;
+
+  font: 8px var(--mono);
+
+  pointer-events: none;
+}
+
+.map-help span {
+  color: var(--red);
+}
+
+/* ================================================
+   13. LOCATION SELECTION POPUP
+================================================ */
+
+.selection-card {
+  position: absolute;
+  z-index: 12;
+
+  top: 50%;
+  left: 50%;
+
+  width: min(310px, calc(100% - 30px));
+
+  padding: 17px;
+
+  color: var(--ink);
+
+  background: var(--panel);
+
+  border: 1px solid #c9cec7;
+  border-top: 3px solid var(--red);
+
+  border-radius: 5px;
+
+  box-shadow: 0 12px 40px rgba(24, 32, 34, 0.2);
+
+  transform: translate(-50%, -50%);
+
+  cursor: default;
+}
+
+.popup-close {
+  position: absolute;
+
+  top: 10px;
+  right: 10px;
+
+  width: 25px;
+  height: 25px;
+
+  display: grid;
+  place-items: center;
+
+  color: var(--muted);
+
+  background: transparent;
+
+  border: 0;
+}
+
+.selection-card h2 {
+  margin: 8px 24px 7px 0;
+
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+
+.popup-coords {
+  color: var(--teal);
+
+  font: 10px/1.8 var(--mono);
+}
+
+.selection-card p {
+  margin: 10px 0;
+
+  color: #697276;
+
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.coverage-note {
+  margin: 12px 0;
+
+  padding: 7px 8px;
+
+  color: #6d7474;
+
+  background: #f0f0eb;
+
+  font: 7px var(--mono);
+  letter-spacing: 0.4px;
+}
+
+/* LAND HERE BUTTON */
+
+.land-button {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 11px 13px;
+
+  color: white;
+
+  background: var(--red);
+
+  border: 0;
+  border-radius: 3px;
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.land-button:hover {
+  background: #ae4038;
+}
+
+.land-button span {
+  font-size: 16px;
+}
+
+.land-disclaimer {
+  display: block;
+
+  margin-top: 8px;
+
+  color: #8a9090;
+
+  text-align: center;
+
+  font: 7px var(--mono);
+}
+
+/* ================================================
+   14. LEFT MAP SIDEBAR
+================================================ */
+
+.left-rail {
+  position: absolute;
+  z-index: 8;
+
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+
+  width: 230px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 0;
+
+  overflow: auto;
+
+  padding: 14px;
+
+  background: rgba(250, 249, 245, 0.97);
+
+  border: 1px solid #d0d3cc;
+  border-radius: 5px;
+
+  box-shadow: 0 5px 20px rgba(32, 40, 40, 0.08);
+}
+
+.rail-section + .rail-section {
+  margin-top: 17px;
+
+  padding-top: 15px;
+
+  border-top: 1px solid var(--line);
+}
+
+.rail-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 12px;
+
+  color: var(--teal);
+
+  font: 8px var(--mono);
+  font-weight: 500;
+
+  letter-spacing: 0.75px;
+}
+
+/* ================================================
+   15. LAYER CONTROLS
+================================================ */
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  padding: 7px 0;
+
+  color: #41494d;
+
+  font-size: 10px;
+}
+
+.layer-row > span {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.layer-row input {
+  width: 14px;
+  height: 14px;
+
+  accent-color: var(--red);
+}
+
+.layer-swatch {
+  width: 12px;
+  height: 12px;
+
+  display: inline-block;
+
+  border: 1px solid #aeb6b0;
+}
+
+.layer-swatch.hill {
+  background: #9da49e;
+}
+
+.layer-swatch.grid {
+  background: repeating-linear-gradient(
+    0deg,
+    #e8e9e4 0 3px,
+    #9ca5a0 3px 4px
+  );
+}
+
+.layer-swatch.site {
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+/* ================================================
+   16. REFERENCE FEATURE LIST
+================================================ */
+
+.rail-site {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 9px 2px;
+
+  color: var(--ink);
+
+  text-align: left;
+
+  background: transparent;
+
+  border: 0;
+  border-bottom: 1px solid #e6e7e1;
+}
+
+.rail-site:hover .rail-site-copy strong {
+  color: var(--red);
+}
+
+.site-index {
+  color: #9a9f9b;
+
+  font: 9px var(--mono);
+}
+
+.rail-site-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.rail-site-copy strong {
+  display: block;
+
+  font-size: 10px;
+}
+
+.rail-site-copy small {
+  display: block;
+
+  margin-top: 4px;
+
+  color: var(--muted);
+
+  font: 7px var(--mono);
+}
+
+.rail-chevron {
+  color: var(--teal);
+}
+
+.rail-footnote {
+  margin: 10px 0 0;
+
+  color: #7c8584;
+
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+/* ================================================
+   17. DATA PROVENANCE
+================================================ */
+
+.rail-data {
+  display: flex;
+
+  gap: 9px;
+
+  margin-top: auto;
+
+  padding: 11px 8px 2px;
+
+  color: var(--teal);
+
+  border-top: 1px solid var(--line);
+}
+
+.rail-data strong {
+  color: var(--ink);
+
+  font: 8px var(--mono);
+  letter-spacing: 0.5px;
+}
+
+.rail-data p {
+  margin: 5px 0 0;
+
+  color: #727b7d;
+
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+/* ================================================
+   18. FLOATING INSPECTION PANEL
+================================================ */
+
+.inspection-panel {
+  position: absolute;
+  z-index: 15;
+
+  top: 0;
+  right: 0;
+  bottom: 0;
+
+  width: 45%;
+
+  min-width: 390px;
+  max-width: 760px;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #f8f7f1;
+
+  border-left: 1px solid #c5cbc5;
+
+  box-shadow: -12px 0 35px rgba(30, 39, 40, 0.15);
+
+  animation: panel-in 0.2s ease-out;
+}
+
+.inspection-panel.expanded {
+  width: 90%;
+  max-width: none;
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(20px);
+    opacity: 0.5;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ================================================
+   19. INSPECTION HEADER
+================================================ */
+
+.inspection-head {
+  min-height: 77px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+
+  padding: 15px 19px;
+
+  background: #eeeee8;
+
+  border-bottom: 1px solid var(--line);
+}
+
+.inspection-head h2 {
+  margin: 5px 0 0;
+
+  font-size: 18px;
+}
+
+.inspection-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.inspection-actions button {
+  width: 31px;
+  height: 31px;
+}
+
+/* ================================================
+   20. INSPECTION SCROLL AREA
+================================================ */
+
+.inspection-scroll {
+  flex: 1;
+
+  overflow: auto;
+
+  padding: 17px 19px 22px;
+}
+
+/* ================================================
+   21. COORDINATE INFORMATION
+================================================ */
+
+.inspection-coordinate {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 6px 15px;
+
+  padding: 12px;
+
+  background: white;
+
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.inspection-coordinate span {
+  color: var(--muted);
+
+  font: 7px var(--mono);
+  letter-spacing: 0.6px;
+}
+
+.inspection-coordinate strong {
+  color: var(--ink);
+
+  font: 10px var(--mono);
+}
+
+/* ================================================
+   22. 3D TERRAIN VIEWER PLACEHOLDER
+================================================ */
+
+.terrain-preview {
+  margin-top: 15px;
+
+  overflow: hidden;
+
+  background: #eceee9;
+
+  border: 1px solid #d0d5ce;
+  border-radius: 4px;
+}
+
+.preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 10px 12px;
+
+  color: var(--ink);
+
+  font: 8px var(--mono);
+  letter-spacing: 0.55px;
+
+  border-bottom: 1px solid #d4d8d2;
+}
+
+.planned-tag {
+  color: #9a6c35;
+}
+
+.terrain-empty {
+  min-height: 155px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 17px 24px;
+
+  color: var(--teal);
+
+  text-align: center;
+}
+
+.terrain-empty strong {
+  margin-top: 9px;
+
+  color: var(--ink);
+
+  font: 9px var(--mono);
+  letter-spacing: 0.4px;
+}
+
+.terrain-empty p {
+  max-width: 390px;
+
+  margin: 7px 0 0;
+
+  color: #707a79;
+
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.terrain-meta {
+  display: flex;
+  justify-content: space-between;
+
+  padding: 8px 12px;
+
+  color: #737d7b;
+
+  background: #f5f5f0;
+
+  border-top: 1px solid #d4d8d2;
+
+  font: 7px var(--mono);
+}
+
+.terrain-meta strong {
+  color: var(--ink);
+}
+
+/* ================================================
+   23. SCIENTIFIC REPORT
+================================================ */
+
+.report-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin: 19px 0 7px;
+
+  color: var(--teal);
+
+  font: 8px var(--mono);
+  letter-spacing: 0.55px;
+}
+
+.report-heading small {
+  color: #8b9290;
+  font-size: 7px;
+}
+
+.report-row {
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  padding: 10px 3px;
+
+  border-bottom: 1px solid #e2e4de;
+}
+
+.report-number {
+  color: #9ba29e;
+
+  font: 9px var(--mono);
+}
+
+.report-row strong {
+  display: block;
+
+  color: var(--ink);
+
+  font-size: 10px;
+}
+
+.report-row small {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #858d8b;
+
+  font: 7px var(--mono);
+  letter-spacing: 0.25px;
+}
+
+/* ================================================
+   24. LANDING ASSESSMENT
+================================================ */
+
+.assessment-box {
+  margin-top: 15px;
+
+  padding: 12px;
+
+  background: #eeeee8;
+
+  border: 1px solid #d4d8d1;
+  border-left: 3px solid #b38a4c;
+}
+
+.assessment-box div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  font: 8px var(--mono);
+}
+
+.assessment-box div span {
+  color: var(--ink);
+}
+
+.assessment-box div strong {
+  color: #936b32;
+}
+
+.assessment-box p {
+  margin: 8px 0 0;
+
+  color: #727b7a;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.source-line {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+
+  margin-top: 14px;
+
+  color: #78817f;
+
+  font-size: 8px;
+}
+
+/* ================================================
+   25. BACK TO MAP BUTTON
+================================================ */
+
+.back-map {
+  min-height: 47px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  color: white;
+
+  background: var(--ink);
+
+  border: 0;
+
+  font: 9px var(--mono);
+  letter-spacing: 0.7px;
+}
+
+.back-map:hover {
+  background: #374147;
+}
+
+/* ================================================
+   26. BOTTOM STATUS BAR
+================================================ */
+
+.bottom-status {
+  min-height: 27px;
+  flex: 0 0 27px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding: 0 17px;
+
+  color: #cbd1cd;
+
+  background: var(--ink);
+
+  font: 7px var(--mono);
+  letter-spacing: 0.35px;
+}
+
+.bottom-status span {
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+}
+
+.bottom-status i {
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: #80a79d;
+}
+
+/* ================================================
+   27. TABLET RESPONSIVENESS
+================================================ */
+
+@media (max-width: 850px) {
+
+  .top-center {
+    display: none;
+  }
+
+  .left-rail {
+    width: 205px;
+  }
+
+  .inspection-panel {
+    width: min(58%, 570px);
+    min-width: 330px;
+  }
+
+  .polar-map {
+    width: min(78vh, 80vw);
+  }
+
+}
+
+/* ================================================
+   28. MOBILE RESPONSIVENESS
+================================================ */
+
+@media (max-width: 600px) {
+
+  .topbar {
+    height: 55px;
+    flex-basis: 55px;
+
+    padding: 0 12px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand-name {
+    font-size: 15px;
+  }
+
+  .top-right {
+    min-width: 0;
+
+    gap: 6px;
+
+    font-size: 7px;
+  }
+
+  .left-rail {
+    top: auto;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+
+    width: auto;
+    max-height: 155px;
+
+    padding: 9px;
+  }
+
+  .rail-section:first-child {
+    display: none;
+  }
+
+  .candidates-section {
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+  }
+
+  .candidates-section .rail-title {
+    margin-bottom: 3px;
+  }
+
+  .rail-site {
+    display: inline-flex;
+
+    width: 32%;
+
+    padding: 6px 2px;
+
+    vertical-align: top;
+  }
+
+  .rail-site-copy small {
+    display: none;
+  }
+
+  .rail-footnote,
+  .rail-data {
+    display: none;
+  }
+
+  .map-top-left,
+  .map-top-right {
+    top: 9px;
+
+    min-width: 0;
+
+    padding: 7px;
+  }
+
+  .map-top-left {
+    left: 9px;
+  }
+
+  .map-top-right {
+    right: 9px;
+  }
+
+  .map-top-left strong,
+  .map-top-right strong {
+    font-size: 8px;
+  }
+
+  .map-top-left small,
+  .map-top-right small {
+    font-size: 6px;
+  }
+
+  .map-bottom-left {
+    display: none;
+  }
+
+  .map-help {
+    top: 60px;
+    right: 10px;
+
+    font-size: 7px;
+  }
+
+  .polar-map {
+    width: min(90vw, 65vh);
+  }
+
+  .inspection-panel,
+  .inspection-panel.expanded {
+    top: 0;
+    right: 0;
+    bottom: 0;
+
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .bottom-status {
+    justify-content: center;
+  }
+
+  .bottom-status span:not(:first-child) {
+    display: none;
+  }
+
+}
+
+
+/* ================================================
+   SELENE-360 — MAP REFINEMENTS
+================================================ */
+
+/* Fit the complete 70°S map inside the viewport.
+   Previously 88vh caused the outer ring to clip. */
+
+.polar-map {
+  width: min(70vh, 76vw, 850px);
+  max-width: 90%;
+
+  background:
+    radial-gradient(
+      circle,
+      #d8dbd5 0%,
+      #e1e3dd 24.4%,
+      #e9eae5 24.5%,
+      #e9eae5 100%
+    );
+
+  --inverse-zoom: 1;
+}
+
+/* Keep SVG coordinate text at a stable screen size.
+   The map geometry still zooms normally. */
+
+.map-label {
+  font-size: calc(1.55px * var(--inverse-zoom, 1));
+}
+
+.pole-text {
+  font-size: calc(1.35px * var(--inverse-zoom, 1));
+}
+
+/* Prevent candidate markers and text from
+   becoming enormous or blurry during zoom. */
+
+.candidate-pin {
+  transform:
+    translate(-50%, -50%)
+    scale(var(--inverse-zoom, 1));
+
+  transform-origin: center;
+}
+
+.pending-marker,
+.committed-marker {
+  transform:
+    translate(-50%, -50%)
+    scale(var(--inverse-zoom, 1));
+}
+
+/* Separate labels for nearby reference features.
+   The actual marker positions remain unchanged. */
+
+.candidate-pin-shackleton span {
+  transform: translate(-14px, -15px);
+}
+
+.candidate-pin-connecting span {
+  transform: translate(11px, 13px);
+}
+
+.candidate-pin-malapert span {
+  transform: translate(11px, -14px);
+}
+
+/* The region information card was hidden underneath
+   the left sidebar. Move it beside the sidebar. */
+
+.map-top-left {
+  left: 260px;
+}
+
+/* Improve map information card contrast. */
+
+.map-top-left,
+.map-top-right,
+.map-bottom-left {
+  background: #faf9f5;
+  border-color: #c9cec7;
+  box-shadow: 0 2px 8px rgba(30, 38, 38, 0.045);
+}
+
+/* Make the difference between the raster coverage
+   and the outer region more visually apparent. */
+
+.coverage-ring {
+  stroke: #c94d43;
+  stroke-width: 0.35;
+  stroke-dasharray: 1.2 0.7;
+}
+
+/* Keep the sidebar completely opaque so underlying
+   map labels never show through it. */
+
+.left-rail {
+  background: #faf9f5;
+  opacity: 1;
+}
+
+/* Better readability for candidate labels. */
+
+.candidate-pin span {
+  background: #252b30;
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+/* Tablet */
+
+@media (max-width: 850px) {
+  .map-top-left {
+    left: 225px;
+  }
+
+  .polar-map {
+    width: min(68vh, 78vw, 700px);
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .map-top-left {
+    left: 9px;
+    top: 85px;
+  }
+
+  .polar-map {
+    width: min(62vh, 90vw);
+  }
+
+  .candidate-pin span {
+    font-size: 8px;
+  }
+}
+/* Larger default polar map */
+.map-viewport {
+  container-type: size;
+}
+
+.polar-map {
+  width: min(94cqh, 94cqw, 1000px);
+  max-width: none;
+}
+
+/* The pole stays visually anchored in the centre */
+.map-content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform-origin: center center;
+}
+
+/* No accidental dragging */
+.map-viewport {
+  cursor: crosshair;
+}
+
+.map-viewport:active {
+  cursor: crosshair;
+}
+
+@media (max-width: 600px) {
+  .polar-map {
+    width: min(92cqh, 92cqw);
+  }
+}
