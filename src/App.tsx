@@ -444,11 +444,11 @@ export default function App() {
 
           <div>
             <div className="brand-name">
-              SELENE<span>·360</span>
+              SOLARIS
             </div>
 
             <div className="brand-caption">
-              LUNAR SOUTH POLE NAVIGATOR
+              LUNAR SOUTH POLE NAVIGATION SYSTEM
             </div>
           </div>
 
@@ -461,7 +461,7 @@ export default function App() {
 
           <span className="top-divider">/</span>
 
-          BUILD 0.5
+          SOLARIS BUILD
         </div>
 
         <div className="top-right">
