@@ -1,9 +1,22 @@
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
+
+import {
+  analyzeLunarIllumination,
+  type LunarIlluminationAnalysis,
+} from './lib/lunarIllumination'
+
+import {
+  sampleElevation,
+  sampleTerrainHorizon,
+  type ElevationSample,
+  type TerrainHorizonProfile,
+} from './lib/lolaElevation'
 
 import type {
   CSSProperties,
@@ -13,7 +26,7 @@ import type {
 import {
   Crosshair,
   Database,
-  Layers3,
+  Layers3, 
   Maximize2,
   Minus,
   Move3D,
@@ -239,7 +252,32 @@ export default function App() {
   const [cursor, setCursor] =
     useState<Point | null>(null)
 
-  
+  const [elevationSample, setElevationSample] =
+    useState<ElevationSample | null>(null)
+
+  const [elevationLoading, setElevationLoading] =
+    useState(false)
+
+  const [elevationError, setElevationError] =
+    useState<string | null>(null)
+
+  const [illuminationAnalysis, setIlluminationAnalysis] =
+    useState<LunarIlluminationAnalysis | null>(null)
+
+  const [illuminationLoading, setIlluminationLoading] =
+    useState(false)
+
+  const [illuminationError, setIlluminationError] =
+    useState<string | null>(null)
+
+  const [terrainHorizon, setTerrainHorizon] =
+    useState<TerrainHorizonProfile | null>(null)
+
+  const [horizonLoading, setHorizonLoading] =
+    useState(false)
+
+  const [horizonError, setHorizonError] =
+    useState<string | null>(null)
 
   // Refs
 
@@ -271,11 +309,147 @@ export default function App() {
     }
   }, [selectedSite])
 
-  const selectedHasRasterCoverage =
-    selectedPoint !== null &&
-    projectedRadius(selectedPoint.latitude) <=
-      DATA_RADIUS_M
+ 
 
+  // --------------------------------------------------
+// NASA LOLA ELEVATION SAMPLING
+// --------------------------------------------------
+
+useEffect(() => {
+  if (!selectedSite) {
+    setElevationSample(null)
+    setElevationError(null)
+    setElevationLoading(false)
+    return
+  }
+
+  let active = true
+
+  setElevationSample(null)
+  setElevationError(null)
+  setElevationLoading(true)
+
+  sampleElevation(
+    selectedSite.latitude,
+    selectedSite.longitude,
+  )
+    .then((result) => {
+      if (active) {
+        setElevationSample(result)
+      }
+    })
+    .catch((error: unknown) => {
+      console.error('NASA LOLA elevation read failed:', error)
+
+      if (active) {
+        setElevationError(
+          error instanceof Error
+            ? error.message
+            : 'Unknown raster read error',
+        )
+      }
+    })
+    .finally(() => {
+      if (active) {
+        setElevationLoading(false)
+      }
+    })
+
+  return () => {
+    active = false
+  }
+}, [selectedSite])
+
+useEffect(() => {
+  if (!selectedSite) {
+    setTerrainHorizon(null)
+    setHorizonError(null)
+    setHorizonLoading(false)
+    return
+  }
+
+  let active = true
+
+  setTerrainHorizon(null)
+  setHorizonError(null)
+  setHorizonLoading(true)
+
+  sampleTerrainHorizon(
+    selectedSite.latitude,
+    selectedSite.longitude,
+  )
+    .then((result) => {
+      if (active) {
+        setTerrainHorizon(result)
+      }
+    })
+    .catch((error: unknown) => {
+      console.error('NASA LOLA terrain horizon failed:', error)
+
+      if (active) {
+        setHorizonError(
+          error instanceof Error
+            ? error.message
+            : 'Unknown terrain horizon error',
+        )
+      }
+    })
+    .finally(() => {
+      if (active) {
+        setHorizonLoading(false)
+      }
+    })
+
+  return () => {
+    active = false
+  }
+}, [selectedSite])
+
+useEffect(() => {
+  if (!selectedSite) {
+    setIlluminationAnalysis(null)
+    setIlluminationError(null)
+    setIlluminationLoading(false)
+    return
+  }
+
+  let active = true
+
+  setIlluminationAnalysis(null)
+  setIlluminationError(null)
+  setIlluminationLoading(true)
+
+  const task = window.setTimeout(() => {
+    try {
+      const result = analyzeLunarIllumination(
+        selectedSite.latitude,
+        selectedSite.longitude,
+        new Date(),
+      )
+
+      if (active) {
+        setIlluminationAnalysis(result)
+      }
+    } catch (error) {
+      if (active) {
+        setIlluminationError(
+          error instanceof Error
+            ? error.message
+            : 'Unknown illumination calculation error',
+        )
+      }
+    } finally {
+      if (active) {
+        setIlluminationLoading(false)
+      }
+    }
+  }, 0)
+
+  return () => {
+    active = false
+    window.clearTimeout(task)
+  }
+}, [selectedSite])
   // ------------------------------------------------
   // FULLSCREEN
   // ------------------------------------------------
@@ -322,89 +496,84 @@ export default function App() {
     setSelectedSite(null)
     setExpanded(false)
   }
-
+  
   // ------------------------------------------------
   // MAP INTERACTION
-  // Fixed-centre zoom. No dragging or panning.
+  // Fixed South Pole. No dragging or panning.
+  // Coordinates are calculated against the unscaled
+  // map dimensions and current zoom.
   // ------------------------------------------------
+
+  function screenToMapPoint(
+    clientX: number,
+    clientY: number,
+  ): Point | null {
+    const viewport = viewportRef.current
+    const map = mapRef.current
+
+    if (!viewport || !map) return null
+
+    const rect = viewport.getBoundingClientRect()
+    const mapSize = map.offsetWidth
+
+    if (!mapSize || !zoom) return null
+
+    // The map is centred inside the viewport.
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+
+    // Undo the fixed-centre zoom mathematically.
+    const xPercent =
+      50 +
+      ((clientX - centerX) / (mapSize * zoom)) * 100
+
+    const yPercent =
+      50 +
+      ((clientY - centerY) / (mapSize * zoom)) * 100
+
+    if (
+      xPercent < 0 ||
+      xPercent > 100 ||
+      yPercent < 0 ||
+      yPercent > 100
+    ) {
+      return null
+    }
+
+    const point = inverseProject(xPercent, yPercent)
+
+    return insideView(point) ? point : null
+  }
 
   function handleMapClick(
     event: ReactMouseEvent<HTMLDivElement>,
   ) {
     const target = event.target as HTMLElement
 
+    // Candidate markers and controls have their own actions.
     if (target.closest('button')) return
 
-    const frame = mapRef.current
+    const point = screenToMapPoint(
+      event.clientX,
+      event.clientY,
+    )
 
-    if (!frame) return
-
-    const rect = frame.getBoundingClientRect()
-
-    const x =
-      ((event.clientX - rect.left) / rect.width) *
-      100
-
-    const y =
-      ((event.clientY - rect.top) / rect.height) *
-      100
-
-    if (
-      x < 0 ||
-      x > 100 ||
-      y < 0 ||
-      y > 100
-    ) {
-      return
-    }
-
-    const point = inverseProject(x, y)
-
-    if (!insideView(point)) return
+    if (!point) return
 
     setPendingSite(point)
     setSelectedSite(null)
   }
 
-  // Cursor coordinate readout.
-  // The transformed map's bounding rectangle is used
-  // so coordinates remain accurate while zooming.
-
   function handlePointerMove(
     event: React.PointerEvent<HTMLDivElement>,
   ) {
-    const frame = mapRef.current
-
-    if (!frame) return
-
-    const rect = frame.getBoundingClientRect()
-
-    const x =
-      ((event.clientX - rect.left) / rect.width) *
-      100
-
-    const y =
-      ((event.clientY - rect.top) / rect.height) *
-      100
-
-    if (
-      x < 0 ||
-      x > 100 ||
-      y < 0 ||
-      y > 100
-    ) {
-      setCursor(null)
-      return
-    }
-
-    const point = inverseProject(x, y)
-
-    setCursor(
-      insideView(point) ? point : null,
+    const point = screenToMapPoint(
+      event.clientX,
+      event.clientY,
     )
-  }
 
-  // Fixed-centre zoom.
+    setCursor(point)
+  }
 
   function zoomBy(factor: number) {
     setZoom((current) =>
@@ -415,13 +584,12 @@ export default function App() {
     )
   }
 
-  // Reset always returns to the larger default view.
-
   function resetView() {
     setZoom(DEFAULT_ZOOM)
     setCursor(null)
     setPendingSite(null)
   }
+
 
   // ------------------------------------------------
   // RENDER
@@ -1134,25 +1302,398 @@ export default function App() {
                 <span>SCIENTIFIC SITE REPORT</span>
                 <small>LIVE DATA STATUS</small>
               </div>
+              <div className="elevation-card">
+  <div className="elevation-card-header">
+    <span>NASA LOLA · SURFACE ELEVATION</span>
+    <span className="elevation-indicator">DEM</span>
+  </div>
+
+  <div className="elevation-value">
+    {elevationLoading
+      ? '...'
+      : elevationSample?.status === 'available'
+        ? elevationSample.elevationM.toFixed(2)
+        : '—'}
+
+    {elevationSample?.status === 'available' && (
+      <span> m</span>
+    )}
+  </div>
+
+  <div className="elevation-description">
+    {elevationLoading
+      ? 'Reading elevation data'
+      : elevationError
+        ? 'Raster read error'
+        : elevationSample?.status === 'available'
+          ? 'Elevation above lunar reference datum'
+          : elevationSample?.status === 'outside-coverage'
+            ? 'Outside available DEM coverage'
+            : elevationSample?.status === 'no-data'
+              ? 'No valid elevation sample'
+              : 'Awaiting elevation data'}
+  </div>
+
+  {elevationSample?.status === 'available' && (
+    <div className="elevation-footer">
+      <span>PIXEL SPACING</span>
+      <strong>{elevationSample.pixelSpacingM} m</strong>
+      <span>SOURCE</span>
+      <strong>NASA LOLA</strong>
+    </div>
+  )}
+</div>
+<section className="horizon-panel">
+
+  <div className="horizon-header">
+    <div>
+      <span className="section-eyebrow">
+        NASA LOLA · TERRAIN ANALYSIS
+      </span>
+
+      <h3>360° Terrain Horizon</h3>
+    </div>
+
+    <span className="data-status">
+      {horizonLoading
+        ? 'SAMPLING'
+        : horizonError
+          ? 'ERROR'
+          : terrainHorizon
+            ? 'DEM PROFILE'
+            : 'NO DATA'}
+    </span>
+  </div>
+
+  {horizonLoading && (
+    <p className="horizon-message">
+      Sampling terrain in 72 compass directions...
+    </p>
+  )}
+
+  {horizonError && (
+    <p className="horizon-error">
+      {horizonError}
+    </p>
+  )}
+
+  {terrainHorizon && (
+    <>
+      <div className="horizon-chart">
+
+        <div className="horizon-chart-label">
+          HORIZON ELEVATION ANGLE
+        </div>
+
+        <svg
+          viewBox="0 0 360 110"
+          role="img"
+          aria-label="Terrain horizon elevation by compass bearing"
+          preserveAspectRatio="none"
+        >
+          {[0, 90, 180, 270, 360].map((angle) => (
+            <g key={angle}>
+              <line
+                x1={angle}
+                y1="8"
+                x2={angle}
+                y2="88"
+                className="horizon-grid-line"
+              />
+
+              <text
+                x={angle === 360 ? 356 : angle}
+                y="105"
+                textAnchor={angle === 0 ? 'start' : angle === 360 ? 'end' : 'middle'}
+                className="horizon-axis-label"
+              >
+                {angle === 360 ? 'N' : `${angle}°`}
+              </text>
+            </g>
+          ))}
+
+          {[0, 30, 60].map((y) => (
+            <line
+              key={y}
+              x1="0"
+              y1={y + 8}
+              x2="360"
+              y2={y + 8}
+              className="horizon-grid-line"
+            />
+          ))}
+
+          <line
+            x1="0"
+            y1="88"
+            x2="360"
+            y2="88"
+            className="horizon-baseline"
+          />
+
+          {terrainHorizon.bins.map((bin) => {
+            if (!Number.isFinite(bin.horizonElevationDeg)) {
+              return null
+            }
+
+            const angle = Math.max(
+              -10,
+              Math.min(30, bin.horizonElevationDeg),
+            )
+
+            const y = 88 - ((angle + 10) / 40) * 80
+
+            return (
+              <line
+                key={bin.azimuthDeg}
+                x1={bin.azimuthDeg}
+                y1="88"
+                x2={bin.azimuthDeg}
+                y2={y}
+                className="horizon-bar"
+              />
+            )
+          })}
+        </svg>
+
+        <div className="horizon-chart-scale">
+          <span>−10°</span>
+          <span>0°</span>
+          <span>+10°</span>
+          <span>+20°</span>
+          <span>+30°</span>
+        </div>
+
+      </div>
+
+      <div className="horizon-stats">
+
+        <div>
+          <span>DIRECTIONS</span>
+          <strong>{terrainHorizon.bins.length}</strong>
+        </div>
+
+        <div>
+          <span>MAX RANGE</span>
+          <strong>
+            {(terrainHorizon.maxDistanceM / 1000).toFixed(0)} km
+          </strong>
+        </div>
+
+        <div>
+          <span>DEM COVERAGE</span>
+          <strong>
+            {terrainHorizon.coveragePercent.toFixed(1)}%
+          </strong>
+        </div>
+
+      </div>
+
+      <div className="horizon-quality">
+
+        <div>
+          <span>VALID TERRAIN SAMPLES</span>
+          <strong>
+            {terrainHorizon.validSamples.toLocaleString()}
+          </strong>
+        </div>
+
+        <div>
+          <span>MISSING SAMPLES</span>
+          <strong>
+            {terrainHorizon.missingSamples.toLocaleString()}
+          </strong>
+        </div>
+
+        <div>
+          <span>SAMPLE SPACING</span>
+          <strong>
+            {terrainHorizon.sampleStepM} m
+          </strong>
+        </div>
+
+        <div>
+          <span>ANGULAR SPACING</span>
+          <strong>
+            {terrainHorizon.azimuthStepDeg}°
+          </strong>
+        </div>
+
+      </div>
+
+      <div className="horizon-disclaimer">
+        <strong>MODEL LIMITATIONS</strong>
+
+        <p>
+          DEM-derived terrain horizon using sampled LOLA
+          elevations and spherical lunar geometry. Small
+          features between samples may be missed. Results
+          are limited by DEM coverage and effective
+          resolution; they are not a certified visibility
+          or landing-safety assessment.
+        </p>
+      </div>
+    </>
+  )}
+
+</section>
+  <section className="illumination-panel">
+
+  <div className="illumination-header">
+    <div>
+      <span className="section-eyebrow">
+        POWER & ENVIRONMENT
+      </span>
+
+      <h3>Lunar Illumination</h3>
+    </div>
+
+    <span className="data-status">
+      {illuminationLoading
+        ? 'CALCULATING'
+        : illuminationError
+          ? 'ERROR'
+          : illuminationAnalysis
+            ? 'PRELIMINARY MODEL'
+            : 'NO DATA'}
+    </span>
+  </div>
+
+  {illuminationLoading && (
+    <p className="illumination-message">
+      Calculating solar geometry across one lunar day...
+    </p>
+  )}
+
+  {illuminationError && (
+    <p className="illumination-error">
+      {illuminationError}
+    </p>
+  )}
+
+  {illuminationAnalysis && (
+    <>
+      <div className="solar-position-grid">
+
+        <div className="solar-metric">
+          <span>Solar elevation</span>
+
+          <strong>
+            {illuminationAnalysis.current.solarElevationDeg.toFixed(2)}°
+          </strong>
+        </div>
+
+        <div className="solar-metric">
+          <span>Solar azimuth</span>
+
+          <strong>
+            {illuminationAnalysis.current.solarAzimuthDeg.toFixed(2)}°
+          </strong>
+        </div>
+
+      </div>
+
+      <div className="illumination-percentage">
+        <div>
+          <span>Geometric illumination</span>
+
+          <strong>
+            {illuminationAnalysis.illuminationPercent.toFixed(1)}%
+          </strong>
+        </div>
+
+        <div className="illumination-track">
+          <div
+            className="illumination-fill"
+            style={{
+              width: `${illuminationAnalysis.illuminationPercent}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="illumination-hours-grid">
+
+        <div>
+          <span>Estimated illuminated time</span>
+
+          <strong>
+            {illuminationAnalysis.illuminatedHours.toFixed(1)} h
+          </strong>
+        </div>
+
+        <div>
+          <span>Estimated shadow time</span>
+
+          <strong>
+            {illuminationAnalysis.shadowHours.toFixed(1)} h
+          </strong>
+        </div>
+
+      </div>
+
+      <div className="solar-range">
+        <div>
+          <span>Maximum solar elevation</span>
+          <strong>
+            {illuminationAnalysis.maxSolarElevationDeg.toFixed(2)}°
+          </strong>
+        </div>
+
+        <div>
+          <span>Minimum solar elevation</span>
+          <strong>
+            {illuminationAnalysis.minSolarElevationDeg.toFixed(2)}°
+          </strong>
+        </div>
+      </div>
+
+      <div className="illumination-disclaimer">
+        <strong>MODEL LIMITATION</strong>
+
+        <p>
+          Preliminary spherical-horizon calculation.
+          Local terrain obstruction, surface relief and
+          solar-panel orientation are not included.
+          These values must not be interpreted as
+          actual available power or verified sunlight duration.
+        </p>
+      </div>
+    </>
+  )}
+
+</section>
 
               {[
                 [
-                  '01',
-                  'Geographic identification',
-                  'REFERENCE COORDINATE AVAILABLE',
-                ],
+  '01',
+  'Geographic identification',
+  `${fmtLat(selectedPoint.latitude)} · ${fmtLon(selectedPoint.longitude)}`,
+],
                 [
-                  '02',
-                  'Terrain science',
-                  selectedHasRasterCoverage
-                    ? 'HILLSHADE AVAILABLE · DEM SAMPLING PENDING'
-                    : 'HIGH-RESOLUTION TERRAIN UNAVAILABLE',
-                ],
+  '02',
+  'Terrain science',
+  horizonLoading
+  ? 'CALCULATING TERRAIN HORIZON'
+  : horizonError
+    ? 'TERRAIN HORIZON UNAVAILABLE'
+    : terrainHorizon
+      ? 'LOLA TERRAIN HORIZON AVAILABLE'
+      : elevationSample?.status === 'available'
+        ? 'ELEVATION AVAILABLE · HORIZON PENDING'
+        : 'TERRAIN DATA UNAVAILABLE',
+],
                 [
-                  '03',
-                  'Power & illumination',
-                  'DATA UNAVAILABLE',
-                ],
+  '03',
+  'Power & illumination',
+  illuminationLoading
+    ? 'CALCULATING SOLAR POSITION'
+    : illuminationAnalysis
+      ? 'PRELIMINARY SOLAR GEOMETRY AVAILABLE'
+      : illuminationError
+        ? 'CALCULATION ERROR'
+        : 'NOT CALCULATED',
+],
                 [
                   '04',
                   'Communications',

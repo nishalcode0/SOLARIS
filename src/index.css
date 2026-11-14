@@ -1705,3 +1705,418 @@ input:focus-visible {
     width: min(92cqh, 92cqw);
   }
 }
+/* =========================================
+   NASA LOLA ELEVATION CARD
+========================================= */
+
+.elevation-card {
+  padding: 18px;
+  margin: 14px 0;
+  background: #eeece4;
+  border: 1px solid #d8d5ca;
+  border-radius: 8px;
+}
+
+.elevation-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #59636a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+
+.elevation-indicator {
+  padding: 4px 7px;
+  background: #dce8e5;
+  color: #397d78;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.elevation-value {
+  margin-top: 14px;
+  color: #252b30;
+  font-size: clamp(30px, 4vw, 42px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.elevation-value span {
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #59636a;
+}
+
+.elevation-description {
+  margin-top: 7px;
+  color: #59636a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.elevation-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 12px;
+  margin-top: 18px;
+  padding-top: 13px;
+  border-top: 1px solid #d8d5ca;
+}
+
+.elevation-footer span {
+  color: #747c80;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.elevation-footer strong {
+  color: #252b30;
+  font-size: 12px;
+  font-weight: 650;
+}
+.report-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 15px 4px;
+  border-bottom: 1px solid #dedbd1;
+}
+
+.report-number {
+  min-width: 27px;
+  color: #397d78;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.report-row strong {
+  color: #252b30;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.report-row small {
+  color: #697278;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* LUNAR ILLUMINATION PANEL */
+
+.illumination-panel {
+  margin: 18px 0;
+  padding: 18px;
+  background: #eeece4;
+  border: 1px solid #d8d5ca;
+  border-radius: 10px;
+}
+
+.illumination-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.illumination-header h3 {
+  margin: 5px 0 0;
+  color: #252b30;
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.section-eyebrow {
+  color: #397d78;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+
+.data-status {
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #e1e8e3;
+  color: #397d78;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.solar-position-grid,
+.illumination-hours-grid,
+.solar-range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.solar-metric,
+.illumination-hours-grid > div,
+.solar-range > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  background: #f7f5ef;
+  border: 1px solid #dedbd1;
+  border-radius: 7px;
+}
+
+.solar-metric span,
+.illumination-hours-grid span,
+.solar-range span {
+  color: #737873;
+  font-size: 11px;
+}
+
+.solar-metric strong {
+  color: #252b30;
+  font-size: 25px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.illumination-hours-grid strong,
+.solar-range strong {
+  color: #252b30;
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.illumination-percentage {
+  margin: 18px 0;
+}
+
+.illumination-percentage > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.illumination-percentage span {
+  color: #535b5c;
+  font-size: 12px;
+}
+
+.illumination-percentage strong {
+  color: #397d78;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.illumination-track {
+  height: 9px;
+  overflow: hidden;
+  background: #d8d6cd;
+  border-radius: 20px;
+}
+
+.illumination-fill {
+  height: 100%;
+  background: #c79b52;
+  border-radius: 20px;
+  transition: width 0.3s ease;
+}
+
+.illumination-disclaimer {
+  padding: 12px;
+  background: #f2e9d8;
+  border-left: 3px solid #c79b52;
+  border-radius: 4px;
+}
+
+.illumination-disclaimer strong {
+  color: #805d2b;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+
+.illumination-disclaimer p {
+  margin: 6px 0 0;
+  color: #5d5549;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.illumination-message,
+.illumination-error {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.illumination-message {
+  color: #737873;
+}
+
+.illumination-error {
+  color: #b4473d;
+}
+
+/* TERRAIN HORIZON */
+
+.horizon-panel {
+  margin: 16px 0;
+  padding: 15px;
+  border: 1px solid var(--border, #d8d5ca);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.horizon-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.horizon-header h3 {
+  margin: 5px 0 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--ink, #252b30);
+}
+
+.horizon-chart {
+  padding: 10px 8px 6px;
+  border-radius: 6px;
+  background: rgba(37, 43, 48, 0.035);
+}
+
+.horizon-chart-label {
+  margin-bottom: 8px;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  color: #777b79;
+}
+
+.horizon-chart svg {
+  display: block;
+  width: 100%;
+  height: 115px;
+  overflow: visible;
+}
+
+.horizon-grid-line {
+  stroke: #a8aaa3;
+  stroke-width: 0.5;
+  stroke-dasharray: 2 3;
+  opacity: 0.55;
+}
+
+.horizon-baseline {
+  stroke: #777b79;
+  stroke-width: 0.9;
+}
+
+.horizon-axis-label {
+  fill: #777b79;
+  font-size: 8px;
+}
+
+.horizon-bar {
+  stroke: #397d78;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.horizon-chart-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: #777b79;
+  font-size: 9px;
+}
+
+.horizon-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.horizon-stats > div,
+.horizon-quality > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.horizon-stats span,
+.horizon-quality span {
+  color: #777b79;
+  font-size: 9px;
+  letter-spacing: 0.055em;
+}
+
+.horizon-stats strong {
+  color: #252b30;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.horizon-quality {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 13px 0;
+  margin-top: 12px;
+  border-top: 1px solid #dedbd1;
+}
+
+.horizon-quality strong {
+  color: #343b3e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.horizon-message,
+.horizon-error {
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.horizon-message {
+  color: #397d78;
+}
+
+.horizon-error {
+  color: #b84c43;
+}
+
+.horizon-disclaimer {
+  padding: 10px;
+  border-left: 2px solid #c79b52;
+  background: rgba(199, 155, 82, 0.08);
+}
+
+.horizon-disclaimer strong {
+  color: #8b6a36;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.horizon-disclaimer p {
+  margin: 5px 0 0;
+  color: #666a68;
+  font-size: 10px;
+  line-height: 1.55;
+}
