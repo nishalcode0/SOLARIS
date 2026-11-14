@@ -10,12 +10,11 @@ import {
   type TerrainHorizonProfile,
 } from './lolaElevation'
 
-const MEAN_LUNAR_DAY_DAYS = 29.53059
+
 const SAMPLE_INTERVAL_HOURS = 1
-const HOURS_PER_DAY = 24
 const MS_PER_HOUR = 60 * 60 * 1000
 
-type Vector3 = {
+ export type Vector3 = {
   x: number
   y: number
   z: number
@@ -75,16 +74,13 @@ function radiansToDegrees(radians: number): number {
 
 // Convert the Sun direction from J2000 equatorial
 // coordinates into the Moon's IAU body-fixed frame.
-function getSunDirectionMoonFixed(date: Date): Vector3 {
-  const moonFromSun = HelioVector(Body.Moon, date)
-
-  // HelioVector points from the Sun to the Moon.
-  // Reverse it to obtain the Moon-to-Sun direction.
-  const sunFromMoon = normalize({
-    x: -moonFromSun.x,
-    y: -moonFromSun.y,
-    z: -moonFromSun.z,
-  })
+// Convert a J2000 equatorial direction into the Moon's
+// IAU body-fixed frame.
+export function directionToMoonFixed(
+  directionJ2000: Vector3,
+  date: Date,
+): Vector3 {
+  const direction = normalize(directionJ2000)
 
   const axis = RotationAxis(Body.Moon, date)
 
@@ -142,9 +138,9 @@ function getSunDirectionMoonFixed(date: Date): Vector3 {
   }
 
   return normalize({
-    x: dot(sunFromMoon, bodyX),
-    y: dot(sunFromMoon, bodyY),
-    z: dot(sunFromMoon, northPole),
+    x: dot(direction, bodyX),
+    y: dot(direction, bodyY),
+    z: dot(direction, northPole),
   })
 }
 
@@ -153,19 +149,31 @@ export function calculateSolarPosition(
   longitude: number,
   date: Date = new Date(),
 ): SolarPositionSample {
+    
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
     latitude < -90 ||
     latitude > 90
   ) {
-    throw new Error('Invalid lunar coordinates.')
+    throw new Error(
+  `Invalid lunar coordinates: latitude=${latitude}, longitude=${longitude}`,
+)
   }
 
   const lat = degreesToRadians(latitude)
   const lon = degreesToRadians(longitude)
 
-  const sun = getSunDirectionMoonFixed(date)
+  const moonFromSun = HelioVector(Body.Moon, date)
+
+const sun = directionToMoonFixed(
+  {
+    x: -moonFromSun.x,
+    y: -moonFromSun.y,
+    z: -moonFromSun.z,
+  },
+  date,
+)
 
   // Local spherical surface reference frame.
   const surfaceNormal: Vector3 = {
@@ -247,16 +255,13 @@ export function analyzeLunarIllumination(
   longitude: number,
   startDate: Date = new Date(),
 ): LunarIlluminationAnalysis {
-  const durationMs =
-    MEAN_LUNAR_DAY_DAYS *
-    HOURS_PER_DAY *
-    MS_PER_HOUR
+  const totalHours = 24
 
   const intervalMs =
     SAMPLE_INTERVAL_HOURS * MS_PER_HOUR
 
   const intervalCount = Math.ceil(
-    durationMs / intervalMs,
+    totalHours / SAMPLE_INTERVAL_HOURS,
   )
 
   const samples: SolarPositionSample[] = []
@@ -264,7 +269,7 @@ export function analyzeLunarIllumination(
   for (let i = 0; i <= intervalCount; i++) {
     const elapsedMs = Math.min(
       i * intervalMs,
-      durationMs,
+      totalHours * MS_PER_HOUR,
     )
 
     const date = new Date(
@@ -299,8 +304,6 @@ export function analyzeLunarIllumination(
     )
   }
 
-  const totalHours = durationMs / MS_PER_HOUR
-
   const shadowHours = totalHours - illuminatedHours
 
   const elevations = samples.map(
@@ -310,14 +313,14 @@ export function analyzeLunarIllumination(
   return {
     startTime: samples[0].timestamp,
     endTime: samples[samples.length - 1].timestamp,
-    durationDays: MEAN_LUNAR_DAY_DAYS,
+    durationDays: 1,
     sampleIntervalHours: SAMPLE_INTERVAL_HOURS,
     current: samples[0],
     samples,
     illuminatedHours,
     shadowHours,
     illuminationPercent:
-      illuminatedHours / totalHours * 100,
+      (illuminatedHours / totalHours) * 100,
     maxSolarElevationDeg: Math.max(...elevations),
     minSolarElevationDeg: Math.min(...elevations),
     method: 'SPHERICAL_HORIZON',

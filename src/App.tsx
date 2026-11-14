@@ -7,14 +7,23 @@ import {
 } from 'react'
 
 import {
+  calculateEarthVisibility,
+  type EarthVisibilityAnalysis,
+} from './lib/lunarCommunications'
+
+import {
   analyzeLunarIllumination,
+  calculateSolarPosition,
   type LunarIlluminationAnalysis,
 } from './lib/lunarIllumination'
 
+
 import {
   sampleElevation,
+  sampleSlope,
   sampleTerrainHorizon,
   type ElevationSample,
+  type SlopeSample,
   type TerrainHorizonProfile,
 } from './lib/lolaElevation'
 
@@ -116,7 +125,7 @@ const DATA_RADIUS_M = 304_000
 const VIEW_RADIUS_M = 622_000
 
 // Map navigation settings.
-const DEFAULT_ZOOM = 1.25
+const DEFAULT_ZOOM = 1.95
 const MIN_ZOOM = 0.75
 const MAX_ZOOM = 5
 
@@ -172,12 +181,10 @@ function inverseProject(
     180 /
     Math.PI
 
-  let longitude =
+  const longitude =
     (Math.atan2(x, y) * 180) / Math.PI
 
-  if (longitude < 0) {
-    longitude += 360
-  }
+ 
 
   return {
     latitude,
@@ -234,6 +241,12 @@ export default function App() {
   const [hillshadeOn, setHillshadeOn] =
     useState(true)
 
+  const [slopeHeatmapOn, setSlopeHeatmapOn] =
+    useState(false)  
+
+  const [illuminationHeatmapOn, setIlluminationHeatmapOn] = 
+    useState(false)
+
   const [gridOn, setGridOn] =
     useState(true)
 
@@ -261,6 +274,10 @@ export default function App() {
   const [elevationError, setElevationError] =
     useState<string | null>(null)
 
+  const [slopeSample, setSlopeSample] = useState<SlopeSample | null>(null)
+  const [slopeLoading, setSlopeLoading] = useState(false)
+  const [slopeError, setSlopeError] = useState<string | null>(null)
+
   const [illuminationAnalysis, setIlluminationAnalysis] =
     useState<LunarIlluminationAnalysis | null>(null)
 
@@ -270,6 +287,9 @@ export default function App() {
   const [illuminationError, setIlluminationError] =
     useState<string | null>(null)
 
+  const [simulationTime, setSimulationTime] =
+    useState(() => new Date())
+
   const [terrainHorizon, setTerrainHorizon] =
     useState<TerrainHorizonProfile | null>(null)
 
@@ -277,6 +297,15 @@ export default function App() {
     useState(false)
 
   const [horizonError, setHorizonError] =
+    useState<string | null>(null)
+
+  const [communicationsAnalysis, setCommunicationsAnalysis] =
+    useState<EarthVisibilityAnalysis | null>(null)
+
+  const [communicationsLoading, setCommunicationsLoading] =
+    useState(false)
+
+  const [communicationsError, setCommunicationsError] =
     useState<string | null>(null)
 
   // Refs
@@ -309,10 +338,34 @@ export default function App() {
     }
   }, [selectedSite])
 
- 
+ const simulationTimeInput = useMemo(() => {
+  const localTime = new Date(
+    simulationTime.getTime() -
+    simulationTime.getTimezoneOffset() * 60000,
+  )
+
+  return localTime.toISOString().slice(0, 16)
+}, [simulationTime])
+
+const liveSolarPosition = useMemo(() => {
+  if (!selectedSite) return null
+
+  return calculateSolarPosition(
+    selectedSite.latitude,
+    selectedSite.longitude,
+    simulationTime,
+  )
+}, [selectedSite, simulationTime])
 
   // --------------------------------------------------
 // NASA LOLA ELEVATION SAMPLING
+// --------------------------------------------------
+
+// --------------------------------------------------
+// UNIFIED LOCATION ANALYSIS PIPELINE
+// --------------------------------------------------
+  // --------------------------------------------------
+// UNIFIED LOCATION ANALYSIS PIPELINE
 // --------------------------------------------------
 
 useEffect(() => {
@@ -320,91 +373,196 @@ useEffect(() => {
     setElevationSample(null)
     setElevationError(null)
     setElevationLoading(false)
+
+    setSlopeSample(null)
+    setSlopeError(null)
+    setSlopeLoading(false)
+
+    setTerrainHorizon(null)
+    setHorizonError(null)
+    setHorizonLoading(false)
+
+    setIlluminationAnalysis(null)
+    setIlluminationError(null)
+    setIlluminationLoading(false)
+
+    setCommunicationsAnalysis(null)
+    setCommunicationsError(null)
+    setCommunicationsLoading(false)
+
     return
   }
 
+  const latitude = selectedSite.latitude
+  const longitude = selectedSite.longitude
+
+  console.log('SOLARIS COMMUNICATIONS INPUT:', {
+  latitude,
+  longitude,
+  latitudeType: typeof latitude,
+  longitudeType: typeof longitude,
+  latitudeFinite: Number.isFinite(latitude),
+  longitudeFinite: Number.isFinite(longitude),
+})
+
   let active = true
 
+  // Reset previous location's results.
   setElevationSample(null)
   setElevationError(null)
   setElevationLoading(true)
 
-  sampleElevation(
-    selectedSite.latitude,
-    selectedSite.longitude,
-  )
-    .then((result) => {
-      if (active) {
-        setElevationSample(result)
-      }
-    })
-    .catch((error: unknown) => {
-      console.error('NASA LOLA elevation read failed:', error)
-
-      if (active) {
-        setElevationError(
-          error instanceof Error
-            ? error.message
-            : 'Unknown raster read error',
-        )
-      }
-    })
-    .finally(() => {
-      if (active) {
-        setElevationLoading(false)
-      }
-    })
-
-  return () => {
-    active = false
-  }
-}, [selectedSite])
-
-useEffect(() => {
-  if (!selectedSite) {
-    setTerrainHorizon(null)
-    setHorizonError(null)
-    setHorizonLoading(false)
-    return
-  }
-
-  let active = true
+  setSlopeSample(null)
+  setSlopeError(null)
+  setSlopeLoading(true)
 
   setTerrainHorizon(null)
   setHorizonError(null)
   setHorizonLoading(true)
 
-  sampleTerrainHorizon(
-    selectedSite.latitude,
-    selectedSite.longitude,
-  )
-    .then((result) => {
-      if (active) {
-        setTerrainHorizon(result)
-      }
-    })
-    .catch((error: unknown) => {
-      console.error('NASA LOLA terrain horizon failed:', error)
+  setIlluminationAnalysis(null)
+  setIlluminationError(null)
+  setIlluminationLoading(true)
 
-      if (active) {
-        setHorizonError(
-          error instanceof Error
-            ? error.message
-            : 'Unknown terrain horizon error',
-        )
-      }
-    })
-    .finally(() => {
-      if (active) {
-        setHorizonLoading(false)
-      }
-    })
+  async function runLocationAnalysis() {
+    const results = await Promise.allSettled([
+      sampleElevation(latitude, longitude),
+
+      sampleSlope(latitude, longitude),
+
+      sampleTerrainHorizon(latitude, longitude),
+
+      Promise.resolve().then(() =>
+        analyzeLunarIllumination(
+          latitude,
+          longitude,
+          simulationTime,
+        ),
+      ),
+    ])
+
+    if (!active) return
+
+    // 1. NASA LOLA elevation
+    const elevationResult = results[0]
+
+    if (elevationResult.status === 'fulfilled') {
+      setElevationSample(elevationResult.value)
+    } else {
+      console.error(
+        'NASA LOLA elevation failed:',
+        elevationResult.reason,
+      )
+
+      setElevationError(
+        elevationResult.reason instanceof Error
+          ? elevationResult.reason.message
+          : 'Unknown elevation sampling error',
+      )
+    }
+
+    setElevationLoading(false)
+
+    // 2. NASA LOLA slope
+    const slopeResult = results[1]
+
+    if (slopeResult.status === 'fulfilled') {
+      setSlopeSample(slopeResult.value)
+    } else {
+      console.error(
+        'NASA LOLA slope analysis failed:',
+        slopeResult.reason,
+      )
+
+      setSlopeError(
+        slopeResult.reason instanceof Error
+          ? slopeResult.reason.message
+          : 'Unknown slope analysis error',
+      )
+    }
+
+    setSlopeLoading(false)
+
+    // 3. DEM terrain horizon
+const horizonResult = results[2]
+
+if (horizonResult.status === 'fulfilled') {
+  const horizonProfile = horizonResult.value
+
+  setTerrainHorizon(horizonProfile)
+
+  // 4. Earth line-of-sight analysis
+  try {
+    const communications =
+      calculateEarthVisibility(
+        latitude,
+        longitude,
+        horizonProfile,
+        new Date(),
+      )
+
+    setCommunicationsAnalysis(communications)
+  } catch (error) {
+    console.error(
+      'Earth visibility calculation failed:',
+      error,
+    )
+
+    setCommunicationsError(
+      error instanceof Error
+        ? error.message
+        : 'Unknown communications calculation error',
+    )
+  }
+} else {
+  console.error(
+    'NASA LOLA horizon analysis failed:',
+    horizonResult.reason,
+  )
+
+  setHorizonError(
+    horizonResult.reason instanceof Error
+      ? horizonResult.reason.message
+      : 'Unknown terrain horizon error',
+  )
+
+  setCommunicationsError(
+    'Earth visibility unavailable because terrain horizon data could not be calculated.',
+  )
+}
+
+setHorizonLoading(false)
+setCommunicationsLoading(false)
+
+    
+  }
+
+  runLocationAnalysis().catch((error: unknown) => {
+    if (!active) return
+
+    console.error(
+      'Location analysis pipeline failed:',
+      error,
+    )
+
+    setElevationError('Location analysis failed')
+    setSlopeError('Location analysis failed')
+    setHorizonError('Location analysis failed')
+    setIlluminationError('Location analysis failed')
+    setCommunicationsError('Location analysis failed')
+
+    setElevationLoading(false)
+    setSlopeLoading(false)
+    setHorizonLoading(false)
+    setIlluminationLoading(false)
+    setCommunicationsLoading(false)
+  })
 
   return () => {
     active = false
   }
 }, [selectedSite])
-
+// TIME-DEPENDENT LUNAR ILLUMINATION
 useEffect(() => {
   if (!selectedSite) {
     setIlluminationAnalysis(null)
@@ -415,41 +573,64 @@ useEffect(() => {
 
   let active = true
 
-  setIlluminationAnalysis(null)
-  setIlluminationError(null)
   setIlluminationLoading(true)
+  setIlluminationError(null)
 
-  const task = window.setTimeout(() => {
-    try {
-      const result = analyzeLunarIllumination(
+  Promise.resolve()
+    .then(() =>
+      analyzeLunarIllumination(
         selectedSite.latitude,
         selectedSite.longitude,
-        new Date(),
-      )
+        simulationTime,
+      ),
+    )
+    .then((analysis) => {
+  if (!active) return
 
-      if (active) {
-        setIlluminationAnalysis(result)
-      }
-    } catch (error) {
-      if (active) {
-        setIlluminationError(
-          error instanceof Error
-            ? error.message
-            : 'Unknown illumination calculation error',
-        )
-      }
-    } finally {
-      if (active) {
-        setIlluminationLoading(false)
-      }
-    }
-  }, 0)
+  console.log('SOLAR ILLUMINATION DIAGNOSTIC', {
+    latitude: selectedSite.latitude,
+    longitude: selectedSite.longitude,
+    start: analysis.startTime,
+    end: analysis.endTime,
+    illuminatedHours: analysis.illuminatedHours,
+    shadowHours: analysis.shadowHours,
+    minimumElevation: analysis.minSolarElevationDeg,
+    maximumElevation: analysis.maxSolarElevationDeg,
+    samplesBelowHorizon: analysis.samples.filter(
+      (sample) => sample.solarElevationDeg < 0,
+    ).length,
+  })
+
+  console.table(
+    analysis.samples.map((sample) => ({
+      time: sample.timestamp,
+      elevation: sample.solarElevationDeg.toFixed(3),
+      sunlit: sample.geometricallySunlit,
+    })),
+  )
+
+  setIlluminationAnalysis(analysis)
+})
+    .catch((error: unknown) => {
+      if (!active) return
+
+      console.error('Lunar illumination calculation failed:', error)
+
+      setIlluminationError(
+        error instanceof Error
+          ? error.message
+          : 'Unknown illumination calculation error',
+      )
+    })
+    .finally(() => {
+      if (active) setIlluminationLoading(false)
+    })
 
   return () => {
     active = false
-    window.clearTimeout(task)
   }
-}, [selectedSite])
+}, [selectedSite, simulationTime])
+
   // ------------------------------------------------
   // FULLSCREEN
   // ------------------------------------------------
@@ -693,7 +874,7 @@ useEffect(() => {
               {hillshadeOn && !mapMissing && (
                 <img
                   className="hillshade-raster"
-                  src="/data/lola-south-pole-hillshade.png"
+                  src="/data/lola-south-pole-hillshade.png?v=2"
                   alt="NASA LOLA south polar hillshade, 80 degrees south to the pole"
                   onLoad={() => setMapReady(true)}
                   onError={() => setMapMissing(true)}
@@ -706,6 +887,60 @@ useEffect(() => {
                   NASA LOLA HILLSHADE FILE UNAVAILABLE
                 </div>
               )}
+
+              {/* NASA LOLA SLOPE HEATMAP */}
+
+{slopeHeatmapOn && (
+  <img
+    className="slope-heatmap-raster"
+    src="/data/lola-south-pole-slope.png"
+    alt="NASA LOLA derived south polar terrain slope heatmap"
+    draggable={false}
+  />
+)}
+{illuminationHeatmapOn && (
+  <img
+    className="illumination-heatmap-raster"
+    src="/data/lola-south-pole-illumination.png"
+    alt="Estimated lunar terrain illumination and shadow heatmap"
+    draggable={false}
+  />
+)}
+
+  {slopeHeatmapOn && (
+  <div className="slope-map-legend">
+    <div className="slope-legend-header">
+      <strong>TERRAIN SLOPE</strong>
+      <span>DEGREES</span>
+    </div>
+
+    <div className="slope-legend-item">
+      <i className="slope-legend-color slope-low" />
+      <span>0° – 5°</span>
+      <small>Gentle</small>
+    </div>
+
+    <div className="slope-legend-item">
+      <i className="slope-legend-color slope-moderate" />
+      <span>5° – 10°</span>
+      <small>Moderate</small>
+    </div>
+
+    <div className="slope-legend-item">
+      <i className="slope-legend-color slope-steep" />
+      <span>10° – 15°</span>
+      <small>Steep</small>
+    </div>
+
+    <div className="slope-legend-item">
+      <i className="slope-legend-color slope-extreme" />
+      <span>15°+</span>
+      <small>Very steep</small>
+    </div>
+
+    <p>NASA LOLA · 80 m source DEM</p>
+  </div>
+)}
 
               {/* COORDINATE GRID */}
 
@@ -1088,6 +1323,34 @@ useEffect(() => {
             </label>
 
             <label className="layer-row">
+  <span>
+    <i className="layer-swatch slope" />
+    Slope heatmap
+  </span>
+
+  <input
+    type="checkbox"
+    checked={slopeHeatmapOn}
+    onChange={(event) =>
+      setSlopeHeatmapOn(event.target.checked)
+    }
+  />
+</label>
+<label className="layer-row">
+  <span>
+    <i className="layer-swatch illumination" />
+    Illumination heatmap
+  </span>
+  <input
+    type="checkbox"
+    checked={illuminationHeatmapOn}
+    onChange={(event) =>
+      setIlluminationHeatmapOn(event.target.checked)
+    }
+  />
+</label>
+
+            <label className="layer-row">
 
               <span>
                 <i className="layer-swatch grid" />
@@ -1341,8 +1604,85 @@ useEffect(() => {
       <span>SOURCE</span>
       <strong>NASA LOLA</strong>
     </div>
-  )}
+
+      )}
 </div>
+
+{/* SURFACE SLOPE ANALYSIS */}
+
+<section className="slope-panel">
+  <div className="slope-header">
+    <div>
+      <span className="section-eyebrow">
+        NASA LOLA · TERRAIN ANALYSIS
+      </span>
+      <h3>Surface Slope</h3>
+    </div>
+
+    <span className="data-status">
+      {slopeLoading
+        ? 'ANALYZING'
+        : slopeError
+          ? 'ERROR'
+          : slopeSample?.status === 'available'
+            ? 'AVAILABLE'
+            : slopeSample?.status === 'outside-coverage'
+              ? 'OUTSIDE COVERAGE'
+              : slopeSample?.status === 'no-data'
+                ? 'NO DATA'
+                : 'AWAITING DATA'}
+    </span>
+  </div>
+
+  {slopeLoading && (
+    <p>Calculating local terrain gradient...</p>
+  )}
+
+  {slopeError && <p>{slopeError}</p>}
+
+  {!slopeLoading && !slopeError &&
+    slopeSample?.status === 'available' && (
+      <>
+        <div className="slope-value">
+          {slopeSample.slopeDeg.toFixed(2)}°
+        </div>
+
+        <div className="slope-details">
+          <div>
+            <span>Gradient magnitude</span>
+            <strong>{slopeSample.gradientMagnitude.toFixed(4)}</strong>
+          </div>
+
+          <div>
+            <span>DEM pixel spacing</span>
+            <strong>{slopeSample.pixelSpacingM} m</strong>
+          </div>
+
+          <div>
+            <span>Calculation method</span>
+            <strong>Horn 3 × 3</strong>
+          </div>
+        </div>
+      </>
+    )}
+
+  {!slopeLoading && !slopeError &&
+    slopeSample?.status === 'outside-coverage' && (
+      <p>Outside available slope data coverage.</p>
+    )}
+
+  {!slopeLoading && !slopeError &&
+    slopeSample?.status === 'no-data' && (
+      <p>No valid surrounding elevation data.</p>
+    )}
+
+  <p className="slope-note">
+    Derived from a 3 × 3 neighborhood of NASA LOLA
+    elevation pixels. Preliminary terrain measurement,
+    not a landing-safety verdict.
+  </p>
+</section>
+
 <section className="horizon-panel">
 
   <div className="horizon-header">
@@ -1537,6 +1877,122 @@ useEffect(() => {
   )}
 
 </section>
+  
+<section className="communications-panel">
+
+  <div className="communications-header">
+    <div>
+      <span className="section-eyebrow">
+        NETWORK & CONNECTIVITY
+      </span>
+
+      <h3>Lunar Communications</h3>
+    </div>
+
+    <span className="data-status">
+      {communicationsLoading
+        ? 'CALCULATING'
+        : communicationsError
+          ? 'ERROR'
+          : communicationsAnalysis
+            ? communicationsAnalysis.visibility
+            : 'NO DATA'}
+    </span>
+  </div>
+
+  {communicationsLoading && (
+    <p className="communications-message">
+      Calculating Earth line-of-sight against local terrain...
+    </p>
+  )}
+
+  {communicationsError && (
+    <p className="communications-error">
+      {communicationsError}
+    </p>
+  )}
+
+  {communicationsAnalysis && (
+    <>
+      <div className="communications-status">
+        <div className="communications-status">
+  <span>GEOMETRIC VISIBILITY</span>
+  <strong>{communicationsAnalysis.visibility}</strong>
+</div>
+      </div>
+      <div className="communications-rating">
+  <span>COMMUNICATIONS RATING</span>
+  <strong>{communicationsAnalysis.geometryRating}</strong>
+  <small>
+    Based on Earth-centre clearance above the
+    sampled terrain horizon. Not a radio-link quality rating.
+  </small>
+</div>
+
+      <div className="communications-grid">
+
+        <div className="solar-metric">
+          <span>Earth elevation</span>
+          <strong>
+            {communicationsAnalysis.earthElevationDeg.toFixed(2)}°
+          </strong>
+        </div>
+
+        <div className="solar-metric">
+          <span>Earth azimuth</span>
+          <strong>
+            {communicationsAnalysis.earthAzimuthDeg.toFixed(2)}°
+          </strong>
+        </div>
+
+        <div className="solar-metric">
+          <span>Terrain horizon</span>
+          <strong>
+  {communicationsAnalysis.terrainHorizonElevationDeg !== null
+    ? `${communicationsAnalysis.terrainHorizonElevationDeg.toFixed(2)}°`
+    : 'UNAVAILABLE'}
+</strong>
+        </div>
+
+        <div className="solar-metric">
+          <span>Clearance angle</span>
+          <strong>
+  {communicationsAnalysis.clearanceAngleDeg !== null
+    ? `${communicationsAnalysis.clearanceAngleDeg.toFixed(2)}°`
+    : 'UNAVAILABLE'}
+</strong>
+        </div>
+
+        <div className="solar-metric">
+          <span>Earth distance</span>
+          <strong>
+            {communicationsAnalysis.earthDistanceKm.toLocaleString(
+              'en-US',
+              { maximumFractionDigits: 0 },
+            )} km
+          </strong>
+        </div>
+
+      </div>
+
+      <div className="communications-disclaimer">
+        <strong>MODEL LIMITATIONS</strong>
+
+        <p>
+          Geometric Earth-centre line-of-sight compared
+          against the sampled LOLA terrain horizon.
+          This is not a radio-frequency link budget.
+          Antenna characteristics, transmission power,
+          receiver sensitivity, atmospheric effects and
+          actual communication performance are not evaluated.
+          Terrain sampling and DEM coverage also limit accuracy.
+        </p>
+      </div>
+    </>
+  )}
+
+</section>
+
   <section className="illumination-panel">
 
   <div className="illumination-header">
@@ -1558,7 +2014,57 @@ useEffect(() => {
             : 'NO DATA'}
     </span>
   </div>
+          {selectedSite && (
+    <div className="solar-time-controls">
+      <span className="section-eyebrow">
+        SIMULATION TIME · LOCAL TIME
+      </span>
 
+      <input
+        type="datetime-local"
+        value={simulationTimeInput}
+        onChange={(event) => {
+          if (!event.target.value) return
+
+          const nextTime = new Date(event.target.value)
+
+          if (!Number.isNaN(nextTime.getTime())) {
+            setSimulationTime(nextTime)
+          }
+        }}
+      />
+
+      <div className="solar-time-buttons">
+        <button
+          onClick={() =>
+            setSimulationTime(
+              (previous) =>
+                new Date(previous.getTime() - 60 * 60 * 1000),
+            )
+          }
+        >
+          − 1 HOUR
+        </button>
+
+        <button
+          onClick={() => setSimulationTime(new Date())}
+        >
+          NOW
+        </button>
+
+        <button
+          onClick={() =>
+            setSimulationTime(
+              (previous) =>
+                new Date(previous.getTime() + 60 * 60 * 1000),
+            )
+          }
+        >
+          + 1 HOUR
+        </button>
+      </div>
+    </div>
+  )}
   {illuminationLoading && (
     <p className="illumination-message">
       Calculating solar geometry across one lunar day...
@@ -1579,7 +2085,7 @@ useEffect(() => {
           <span>Solar elevation</span>
 
           <strong>
-            {illuminationAnalysis.current.solarElevationDeg.toFixed(2)}°
+            {liveSolarPosition?.solarElevationDeg.toFixed(2) ?? '--'}
           </strong>
         </div>
 
@@ -1587,11 +2093,24 @@ useEffect(() => {
           <span>Solar azimuth</span>
 
           <strong>
-            {illuminationAnalysis.current.solarAzimuthDeg.toFixed(2)}°
+            {liveSolarPosition?.solarAzimuthDeg.toFixed(2) ?? '--'}
           </strong>
         </div>
 
       </div>
+      {liveSolarPosition && (
+  <div className="solar-live-status">
+    <strong>
+      {liveSolarPosition.geometricallySunlit
+        ? 'SUN ABOVE SPHERICAL HORIZON'
+        : 'GEOMETRIC LUNAR NIGHT'}
+    </strong>
+
+    <span>
+      {simulationTime.toLocaleString()}
+    </span>
+  </div>
+)}
 
       <div className="illumination-percentage">
         <div>

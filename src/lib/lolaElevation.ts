@@ -135,6 +135,116 @@ export async function sampleElevation(
   }
 }
 
+export type SlopeSample =
+  | {
+      status: 'available'
+      slopeDeg: number
+      gradientMagnitude: number
+      elevationM: number
+      pixelColumn: number
+      pixelRow: number
+      pixelSpacingM: number
+      method: 'HORN_3X3'
+      source: string
+    }
+  | {
+      status: 'outside-coverage'
+    }
+  | {
+      status: 'no-data'
+    }
+
+export async function sampleSlope(
+  latitude: number,
+  longitude: number,
+): Promise<SlopeSample> {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > -80
+  ) {
+    return { status: 'outside-coverage' }
+  }
+
+  const projected = projectedCoordinates(latitude, longitude)
+
+  if (projected.rho > COVERAGE_RADIUS_M) {
+    return { status: 'outside-coverage' }
+  }
+
+  const pixelColumn = Math.floor(
+    (projected.x - RASTER_ORIGIN_X) / PIXEL_SIZE_M,
+  )
+
+  const pixelRow = Math.floor(
+    (RASTER_ORIGIN_Y - projected.y) / PIXEL_SIZE_M,
+  )
+
+  // A complete 3 × 3 neighbourhood is required.
+  if (
+    pixelColumn < 1 ||
+    pixelColumn >= RASTER_WIDTH - 1 ||
+    pixelRow < 1 ||
+    pixelRow >= RASTER_HEIGHT - 1
+  ) {
+    return { status: 'outside-coverage' }
+  }
+
+  const image = await getElevationImage()
+
+  const raster = await image.readRasters({
+    window: [
+      pixelColumn - 1,
+      pixelRow - 1,
+      pixelColumn + 2,
+      pixelRow + 2,
+    ],
+    samples: [0],
+    interleave: true,
+  }) as Float32Array
+
+  if (raster.length !== 9) {
+    return { status: 'no-data' }
+  }
+
+  const z = Array.from(raster, Number)
+
+  // Every cell must contain a valid elevation.
+  if (!z.every(Number.isFinite)) {
+    return { status: 'no-data' }
+  }
+
+  // Horn 3 × 3 gradient estimator.
+  const dzdx =
+    (z[2] + 2 * z[5] + z[8] -
+      z[0] - 2 * z[3] - z[6]) /
+    (8 * PIXEL_SIZE_M)
+
+  const dzdy =
+    (z[6] + 2 * z[7] + z[8] -
+      z[0] - 2 * z[1] - z[2]) /
+    (8 * PIXEL_SIZE_M)
+
+  const gradientMagnitude = Math.hypot(dzdx, dzdy)
+
+  const slopeDeg =
+    Math.atan(gradientMagnitude) * 180 / Math.PI
+
+  return {
+    status: 'available',
+    slopeDeg,
+    gradientMagnitude,
+    elevationM: z[4],
+    pixelColumn,
+    pixelRow,
+    pixelSpacingM: PIXEL_SIZE_M,
+    method: 'HORN_3X3',
+    source: 'NASA LOLA LDEM_80S_80MPP_ADJ',
+  }
+}
+
+
 const LUNAR_RADIUS_M = 1_737_400
 const HORIZON_MAX_DISTANCE_M = 20_000
 const HORIZON_SAMPLE_STEP_M = 160
@@ -439,5 +549,116 @@ export function getHorizonAtAzimuth(
     distanceM:
       lower.distanceM +
       (upper.distanceM - lower.distanceM) * fraction,
+  }
+}
+
+export interface TerrainPatch {
+  width: number
+  height: number
+  spacingM: number
+  patchSizeM: number
+  centerX: number
+  centerY: number
+  elevations: Float32Array
+  source: string
+}
+
+export async function loadTerrainPatch(
+  latitude: number,
+  longitude: number,
+  patchSizeM = 50_000,
+): Promise<TerrainPatch> {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > -80
+  ) {
+    throw new Error('Selected location is outside LOLA coverage.')
+  }
+
+  if (!Number.isFinite(patchSizeM) || patchSizeM <= 0) {
+    throw new Error('Invalid terrain patch size.')
+  }
+
+  const projected = projectedCoordinates(latitude, longitude)
+
+  if (projected.rho > COVERAGE_RADIUS_M) {
+    throw new Error('Selected location is outside LOLA coverage.')
+  }
+
+  // Keep the native 80 m LOLA pixel spacing.
+  // An odd grid places the selected centre pixel in the middle.
+  const gridSize = Math.floor(patchSizeM / PIXEL_SIZE_M)
+
+  if (gridSize < 3) {
+    throw new Error('Terrain patch is too small.')
+  }
+
+  const width = gridSize
+  const height = gridSize
+  const half = Math.floor(gridSize / 2)
+
+  const centerColumn = Math.floor(
+    (projected.x - RASTER_ORIGIN_X) / PIXEL_SIZE_M,
+  )
+
+  const centerRow = Math.floor(
+    (RASTER_ORIGIN_Y - projected.y) / PIXEL_SIZE_M,
+  )
+
+  const left = centerColumn - half
+  const top = centerRow - half
+  const right = left + width
+  const bottom = top + height
+
+  // Never silently crop a patch at the edge of the dataset.
+  if (
+    left < 0 ||
+    top < 0 ||
+    right > RASTER_WIDTH ||
+    bottom > RASTER_HEIGHT
+  ) {
+    throw new Error(
+      'The complete terrain patch is not available at this location.',
+    )
+  }
+
+  const image = await getElevationImage()
+
+  const raster = await image.readRasters({
+    window: [left, top, right, bottom],
+    samples: [0],
+    interleave: true,
+  }) as Float32Array
+
+  if (raster.length !== width * height) {
+    throw new Error('Unexpected LOLA terrain patch dimensions.')
+  }
+
+  const elevations = new Float32Array(raster.length)
+
+  for (let i = 0; i < raster.length; i++) {
+    const elevation = Number(raster[i])
+
+    // Preserve missing data as NaN; do not invent elevations.
+    elevations[i] = Number.isFinite(elevation)
+      ? elevation
+      : Number.NaN
+  }
+
+  return {
+    width,
+    height,
+    spacingM: PIXEL_SIZE_M,
+    patchSizeM: width * PIXEL_SIZE_M,
+    centerX:
+      RASTER_ORIGIN_X +
+      (centerColumn + 0.5) * PIXEL_SIZE_M,
+    centerY:
+      RASTER_ORIGIN_Y -
+      (centerRow + 0.5) * PIXEL_SIZE_M,
+    elevations,
+    source: 'NASA LOLA LDEM_80S_80MPP_ADJ',
   }
 }
