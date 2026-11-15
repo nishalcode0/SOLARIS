@@ -1,4 +1,3 @@
-
 import type {
   ElevationSample,
   SlopeSample,
@@ -21,8 +20,11 @@ function unavailableWaterIceEvidence(): WaterIceEvidence {
     thermalEvidence: 'unavailable',
     radarEvidence: 'unavailable',
     explanation:
-      'No validated water-ice observation datasets are connected yet. ' +
-      'Terrain and shadow conditions cannot independently confirm water ice.',
+      'Direct orbital water-ice observations are not yet integrated. ' +
+      'LEND hydrogen measurements, Diviner thermal observations, and ' +
+      'Mini-RF radar observations must be evaluated independently. ' +
+      'Terrain and permanently shadowed region mapping provide context, ' +
+      'not proof of water-ice presence.',
   }
 }
 
@@ -55,8 +57,6 @@ export function buildLunarResourceAssessment(
     slope,
     horizon,
     psr,
-
-    // PSR mask encoding has not yet been independently verified.
     shadowStatus,
 
     waterIce: unavailableWaterIceEvidence(),
@@ -65,11 +65,8 @@ export function buildLunarResourceAssessment(
       terrain:
         elevation.status === 'available' &&
         slope.status === 'available',
-
       horizon: horizon !== null,
-
       psr: psr.status === 'available',
-
       waterIceObservations: false,
       thermalObservations: false,
       radarObservations: false,
@@ -78,7 +75,11 @@ export function buildLunarResourceAssessment(
     assessedAt: new Date().toISOString(),
 
     methodology:
-      'NASA LOLA terrain, 20 m/pixel PSR raster sampling, and membership testing against mapped NASA PSR polygons. Raster encoding is unverified; polygon membership indicates mapped PSR status, not direct confirmation of surface illumination or water ice.',
-      
+      'Terrain assessment uses NASA LOLA elevation and derived slope. ' +
+      'Mapped PSR membership uses NASA south-polar PSR polygons. ' +
+      'The PSR raster binary encoding remains unverified. Terrain ' +
+      'shadow and mapped PSR membership are contextual indicators only. ' +
+      'No direct LEND hydrogen, Diviner thermal, or Mini-RF radar ' +
+      'water-ice observations are currently integrated.',
   }
 }

@@ -4,17 +4,28 @@ import * as THREE from 'three'
 
 import { calculateSolarPosition } from '../lib/lunarIllumination'
 import { createTerrainTextures } from '../three/createTerrainTextures'
-import { loadTerrainPatch } from '../lib/lolaElevation'
+import {
+  loadTerrainPatch,
+  type TerrainPatch,
+} from '../lib/lolaElevation'
 import { createTerrainMesh } from '../three/createTerrainMesh'
 import { createLunarScene } from '../three/createLunarScene'
+
+import {
+  createPSROverlay,
+  type PSRFeature,
+} from '../three/createPSROverlay'
 
 interface LunarTerrain3DProps {
   latitude: number
   longitude: number
   simulationTime: Date
+  psrFeatures: PSRFeature[]
 }
 
-function disposeMaterial(material: THREE.Material | THREE.Material[]) {
+function disposeMaterial(
+  material: THREE.Material | THREE.Material[],
+) {
   if (Array.isArray(material)) {
     material.forEach((item) => item.dispose())
   } else {
@@ -22,14 +33,25 @@ function disposeMaterial(material: THREE.Material | THREE.Material[]) {
   }
 }
 
+function disposePSROverlay(overlay: THREE.Group) {
+  overlay.traverse((object) => {
+    if (object instanceof THREE.LineSegments) {
+      object.geometry.dispose()
+      disposeMaterial(object.material)
+    }
+  })
+}
+
 export default function LunarTerrain3D({
   latitude,
   longitude,
   simulationTime,
+  psrFeatures,
 }: LunarTerrain3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
+  const materialRef =
+    useRef<THREE.MeshStandardMaterial | null>(null)
 
   const texturesRef = useRef<{
     elevation: THREE.DataTexture
@@ -37,17 +59,29 @@ export default function LunarTerrain3D({
   } | null>(null)
 
   const lightingRef =
-    useRef<ReturnType<typeof createLunarScene>['lighting'] | null>(null)
+    useRef<ReturnType<typeof createLunarScene>['lighting'] | null>(
+      null,
+    )
 
-  // Always keep the latest simulation time available to scene initialization.
+  const sceneRef = useRef<THREE.Scene | null>(null)
+  const terrainPatchRef = useRef<TerrainPatch | null>(null)
+  const psrOverlayRef = useRef<THREE.Group | null>(null)
+
   const simulationTimeRef = useRef(simulationTime)
   simulationTimeRef.current = simulationTime
 
-  const [status, setStatus] = useState('Loading lunar terrain...')
+  const [status, setStatus] = useState(
+    'Loading lunar terrain...',
+  )
+
   const [error, setError] = useState<string | null>(null)
   const [slopeEnabled, setSlopeEnabled] = useState(false)
+  const [psrContextEnabled, setPsrContextEnabled] =
+    useState(false)
 
-  // Load and initialize the terrain scene when the selected location changes.
+  const [terrainReady, setTerrainReady] = useState(false)
+
+  // Initialize the terrain scene when the selected location changes.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -55,21 +89,27 @@ export default function LunarTerrain3D({
     let cancelled = false
     let animationFrame = 0
 
-    let lunarScene: ReturnType<typeof createLunarScene> | null = null
-    let terrain: ReturnType<typeof createTerrainMesh> | null = null
+    let lunarScene: ReturnType<typeof createLunarScene> | null =
+      null
+
+    let terrain: ReturnType<typeof createTerrainMesh> | null =
+      null
+
     let resizeObserver: ResizeObserver | null = null
     let landingMarker: THREE.Group | null = null
 
+    setTerrainReady(false)
+    setError(null)
+
     async function initialize() {
       try {
-        setError(null)
         setStatus('Loading NASA LOLA elevation data...')
 
         lunarScene = createLunarScene(container!)
 
+        sceneRef.current = lunarScene.scene
         lightingRef.current = lunarScene.lighting
 
-        // Set sunlight using the current mission simulation time.
         const solar = calculateSolarPosition(
           latitude,
           longitude,
@@ -92,6 +132,7 @@ export default function LunarTerrain3D({
 
         resizeObserver = new ResizeObserver((entries) => {
           const entry = entries[0]
+
           if (!entry || !lunarScene) return
 
           lunarScene.resize(
@@ -109,6 +150,8 @@ export default function LunarTerrain3D({
         )
 
         if (cancelled || !lunarScene) return
+
+        terrainPatchRef.current = patch
 
         setStatus('Generating 3D lunar terrain...')
 
@@ -141,7 +184,11 @@ export default function LunarTerrain3D({
           landingMarker = new THREE.Group()
           landingMarker.name = 'SELECTED_LANDING_SITE'
 
-          const ringGeometry = new THREE.RingGeometry(400, 480, 80)
+          const ringGeometry = new THREE.RingGeometry(
+            400,
+            480,
+            80,
+          )
 
           const ringMaterial = new THREE.MeshBasicMaterial({
             color: 0xff3030,
@@ -149,7 +196,11 @@ export default function LunarTerrain3D({
             depthWrite: false,
           })
 
-          const ring = new THREE.Mesh(ringGeometry, ringMaterial)
+          const ring = new THREE.Mesh(
+            ringGeometry,
+            ringMaterial,
+          )
+
           ring.rotation.x = -Math.PI / 2
           ring.position.y = 25
           ring.renderOrder = 10
@@ -162,7 +213,11 @@ export default function LunarTerrain3D({
             depthWrite: false,
           })
 
-          const dot = new THREE.Mesh(dotGeometry, dotMaterial)
+          const dot = new THREE.Mesh(
+            dotGeometry,
+            dotMaterial,
+          )
+
           dot.rotation.x = -Math.PI / 2
           dot.position.y = 27
           dot.renderOrder = 11
@@ -183,6 +238,8 @@ export default function LunarTerrain3D({
         setStatus(
           `LOLA TERRAIN READY · ${terrain.validSamples.toLocaleString()} valid samples`,
         )
+
+        setTerrainReady(true)
       } catch (err) {
         if (cancelled) return
 
@@ -193,6 +250,8 @@ export default function LunarTerrain3D({
             ? err.message
             : 'Unable to load lunar terrain.',
         )
+
+        setStatus('TERRAIN LOAD FAILED')
       }
     }
 
@@ -203,6 +262,12 @@ export default function LunarTerrain3D({
 
       cancelAnimationFrame(animationFrame)
       resizeObserver?.disconnect()
+
+      if (psrOverlayRef.current) {
+        lunarScene?.scene.remove(psrOverlayRef.current)
+        disposePSROverlay(psrOverlayRef.current)
+        psrOverlayRef.current = null
+      }
 
       if (terrain) {
         terrain.mesh.geometry.dispose()
@@ -226,12 +291,14 @@ export default function LunarTerrain3D({
 
       materialRef.current = null
       lightingRef.current = null
+      sceneRef.current = null
+      terrainPatchRef.current = null
 
       lunarScene?.dispose()
     }
   }, [latitude, longitude])
 
-  // Update the 3D sunlight whenever mission simulation time changes.
+  // Update sunlight when simulation time changes.
   useEffect(() => {
     const lighting = lightingRef.current
     if (!lighting) return
@@ -248,7 +315,7 @@ export default function LunarTerrain3D({
     )
   }, [latitude, longitude, simulationTime])
 
-  // Switch between natural lunar grey and the optional slope heatmap.
+  // Switch between natural lunar grey and slope heatmap.
   useEffect(() => {
     const material = materialRef.current
     const textures = texturesRef.current
@@ -265,6 +332,59 @@ export default function LunarTerrain3D({
 
     material.needsUpdate = true
   }, [slopeEnabled])
+
+  // Display or remove the mapped NASA PSR boundaries.
+  useEffect(() => {
+    const scene = sceneRef.current
+    const patch = terrainPatchRef.current
+
+    if (psrOverlayRef.current) {
+      const previous = psrOverlayRef.current
+
+      scene?.remove(previous)
+      disposePSROverlay(previous)
+
+      psrOverlayRef.current = null
+    }
+
+    if (
+      !psrContextEnabled ||
+      !terrainReady ||
+      !scene ||
+      !patch ||
+      psrFeatures.length === 0
+    ) {
+      return
+    }
+
+    const overlay = createPSROverlay(
+      patch,
+      psrFeatures,
+    )
+
+    if (overlay.children.length === 0) {
+      setStatus(
+        'LOLA TERRAIN READY · No mapped PSR boundaries in this patch',
+      )
+      return
+    }
+
+    psrOverlayRef.current = overlay
+    scene.add(overlay)
+
+    return () => {
+      scene.remove(overlay)
+      disposePSROverlay(overlay)
+
+      if (psrOverlayRef.current === overlay) {
+        psrOverlayRef.current = null
+      }
+    }
+  }, [
+    psrContextEnabled,
+    psrFeatures,
+    terrainReady,
+  ])
 
   return (
     <div
@@ -302,20 +422,40 @@ export default function LunarTerrain3D({
           pointerEvents: 'none',
         }}
       >
-        <div style={{ fontWeight: 700, letterSpacing: '1px' }}>
+        <div
+          style={{
+            fontWeight: 700,
+            letterSpacing: '1px',
+          }}
+        >
           SOLARIS · LUNAR TERRAIN
         </div>
 
-        <div style={{ marginTop: '5px', color: '#c49b72' }}>
+        <div
+          style={{
+            marginTop: '5px',
+            color: '#c49b72',
+          }}
+        >
           50 × 50 KM · 2× VERTICAL EXAGGERATION
         </div>
 
-        <div style={{ marginTop: '5px', color: '#b8c2cc' }}>
+        <div
+          style={{
+            marginTop: '5px',
+            color: '#b8c2cc',
+          }}
+        >
           {status}
         </div>
 
         {error && (
-          <div style={{ marginTop: '8px', color: '#ff8b75' }}>
+          <div
+            style={{
+              marginTop: '8px',
+              color: '#ff8b75',
+            }}
+          >
             {error}
           </div>
         )}
@@ -366,6 +506,48 @@ export default function LunarTerrain3D({
           />
           Slope heatmap
         </label>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '9px',
+            marginTop: '12px',
+            fontSize: '13px',
+            cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={psrContextEnabled}
+            onChange={(event) =>
+              setPsrContextEnabled(event.target.checked)
+            }
+          />
+          Mapped PSR context
+        </label>
+
+        {psrContextEnabled && (
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '9px',
+              borderRadius: '6px',
+              background: 'rgba(255,147,90,0.12)',
+              color: '#ffb17f',
+              fontSize: '10px',
+              lineHeight: 1.5,
+            }}
+          >
+            NASA MAPPED PSR BOUNDARIES
+            <br />
+            Orange outlines show mapped permanently shadowed
+            regions intersecting this terrain patch.
+            <br />
+            <br />
+            Context only. Not direct water-ice detection.
+          </div>
+        )}
       </div>
     </div>
   )

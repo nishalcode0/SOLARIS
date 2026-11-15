@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
 } from 'react'
 
 import LunarTerrain3D from './components/LunarTerrain3D'
@@ -11,6 +12,8 @@ import MissionTimeController from './components/MissionTimeController'
 import HorizonIntelligence from './components/HorizonIntelligence'
 import { samplePSR } from './lib/lunarPSR'
 import type { PSRSample } from './lib/lunarPSR'
+import { evaluateMissionDecision } from './lib/missionDecision'
+import SiteComparison from './components/SiteComparison'
 
 
 import {
@@ -356,6 +359,12 @@ export default function App() {
   const [selectedSite, setSelectedSite] =
     useState<Selection | null>(null)
 
+  const [comparisonSites, setComparisonSites] =  
+    useState<Site[]>([])
+  
+  const [comparisonOpen, setComparisonOpen] = 
+    useState(false)
+
   const [terrainFocus, setTerrainFocus] =
     useState<Point | null>(null)
 
@@ -450,6 +459,12 @@ export default function App() {
 const [psrFeatures, setPsrFeatures] = useState<PSRFeature[]>([])
 const [psrError, setPsrError] = useState(false)
 
+  const comparisonShadowAssessor = useCallback(
+  (latitude: number, longitude: number) =>
+    assessMappedPSR(latitude, longitude, psrFeatures),
+  [psrFeatures],
+)
+
 useEffect(() => {
   let active = true
 
@@ -502,6 +517,34 @@ useEffect(() => {
   }, [selectedSite])
 
 
+const missionDecision = useMemo(() => {
+  return evaluateMissionDecision({
+    elevationAvailable: elevationSample?.status === 'available',
+    slopeAvailable: slopeSample?.status === 'available',
+    slopeDeg:
+      slopeSample?.status === 'available'
+        ? slopeSample.slopeDeg
+        : null,
+    horizonAvailable: terrainHorizon !== null,
+    communicationsAvailable: communicationsAnalysis !== null,
+    earthVisibility: communicationsAnalysis?.visibility ?? null,
+    illuminationAvailable: illuminationAnalysis !== null,
+    illuminationPercent:
+      illuminationAnalysis?.illuminationPercent ?? null,
+    psrAssessmentAvailable:
+      resourceAssessment !== null &&
+      resourceAssessment.shadowStatus !== 'insufficient-data',
+    waterIceObservationsAvailable:
+      resourceAssessment?.dataCoverage.waterIceObservations ?? false,
+  })
+}, [
+  elevationSample,
+  slopeSample,
+  terrainHorizon,
+  communicationsAnalysis,
+  illuminationAnalysis,
+  resourceAssessment,
+])
 
 const liveSolarPosition = useMemo(() => {
   if (!selectedSite) return null
@@ -878,6 +921,58 @@ useEffect(() => {
     setPendingSite(site)
     setSelectedSite(null)
   }
+
+  function toggleComparisonSite(site: Site) {
+  setComparisonSites((current) => {
+    const alreadySelected = current.some(
+      (item) => item.id === site.id,
+    )
+
+    if (alreadySelected) {
+      return current.filter((item) => item.id !== site.id)
+    }
+
+    if (current.length >= 3) {
+      return current
+    }
+
+    return [...current, site]
+  })
+}
+
+  function addPendingToComparison() {
+  if (!pendingSite) return
+
+  const site: Site = isSite(pendingSite)
+    ? pendingSite
+    : {
+        id: `custom-${pendingSite.latitude.toFixed(5)}-${pendingSite.longitude.toFixed(5)}`,
+        name: `Custom location ${comparisonSites.filter(
+          (item) => item.id.startsWith('custom-'),
+        ).length + 1}`,
+        code: 'CUSTOM COORDINATE',
+        latitude: pendingSite.latitude,
+        longitude: pendingSite.longitude,
+        terrain: 'Unclassified terrain',
+        description: 'User-selected lunar map coordinate.',
+        source: 'User-selected map coordinate',
+      }
+
+  setComparisonSites((current) => {
+    if (current.some((item) => item.id === site.id)) {
+      return current
+    }
+
+    if (current.length >= 3) return current
+
+    return [...current, site]
+  })
+}
+
+function startComparison() {
+  if (comparisonSites.length < 2) return
+  setComparisonOpen(true)
+}
 
  function landHere() {
   if (!pendingSite) return
@@ -1563,6 +1658,25 @@ useEffect(() => {
                 <span>→</span>
               </button>
 
+              <button
+  className="land-button comparison-add-button"
+  onClick={addPendingToComparison}
+  disabled={
+    comparisonSites.length >= 3 &&
+    !comparisonSites.some(
+      (site) =>
+        site.id === (
+          isSite(pendingSite)
+            ? pendingSite.id
+            : `custom-${pendingPoint.latitude.toFixed(5)}-${pendingPoint.longitude.toFixed(5)}`
+        ),
+    )
+  }
+>
+  ADD TO COMPARISON
+  <span>+</span>
+</button>
+
               <small className="land-disclaimer">
                 INSPECT CANDIDATE · NOT A LANDING APPROVAL
               </small>
@@ -1582,6 +1696,7 @@ useEffect(() => {
                 latitude={terrainFocus.latitude}
                 longitude={terrainFocus.longitude}
                 simulationTime={simulationTime}
+                psrFeatures={psrFeatures}
               />
             )}
 
@@ -1730,39 +1845,68 @@ useEffect(() => {
               <Crosshair size={16} />
             </div>
 
-            {SITES.map((site, index) => (
-              <button
-                className="rail-site"
-                key={site.id}
-                onClick={() => openCandidate(site)}
-              >
+            {SITES.map((site, index) => {
+  const isAdded = comparisonSites.some(
+    (item) => item.id === site.id,
+  )
 
-                <span className="site-index">
-                  0{index + 1}
-                </span>
+  return (
+    <div className="rail-site-row" key={site.id}>
+      <button
+        className="rail-site"
+        onClick={() => openCandidate(site)}
+      >
+        <span className="site-index">
+          0{index + 1}
+        </span>
 
-                <span className="rail-site-copy">
+        <span className="rail-site-copy">
+          <strong>{site.name}</strong>
 
-                  <strong>{site.name}</strong>
+          <small>
+            {fmtLat(site.latitude)} ·{' '}
+            {fmtLon(site.longitude)}
+          </small>
+        </span>
 
-                  <small>
-                    {fmtLat(site.latitude)} ·{' '}
-                    {fmtLon(site.longitude)}
-                  </small>
+        <span className="rail-chevron">
+          ↗
+        </span>
+      </button>
 
-                </span>
+      <button
+        className={`rail-compare-add ${isAdded ? 'selected' : ''}`}
+        onClick={() => toggleComparisonSite(site)}
+        disabled={!isAdded && comparisonSites.length >= 3}
+        title={
+          isAdded
+            ? 'Remove from comparison'
+            : 'Add to comparison'
+        }
+      >
+        {isAdded ? 'ADDED' : '+ COMPARE'}
+      </button>
+    </div>
+  )
+})}
 
-                <span className="rail-chevron">
-                  ↗
-                </span>
+<p className="rail-footnote">
+  Named-feature reference coordinates only.
+  Not surveyed landing ellipses.
+</p>
 
-              </button>
-            ))}
+<div className="rail-compare-footer">
+  <span>
+    {comparisonSites.length}/3 SELECTED
+  </span>
 
-            <p className="rail-footnote">
-              Named-feature reference coordinates only.
-              Not surveyed landing ellipses.
-            </p>
+  <button
+    disabled={comparisonSites.length < 2}
+    onClick={startComparison}
+  >
+    COMPARE SITES →
+  </button>
+</div>
 
           </div>
 
@@ -2287,6 +2431,160 @@ useEffect(() => {
           actual available power or verified sunlight duration.
         </p>
       </div>
+
+    
+<div className="mission-tradeoff-panel">
+  <div
+    className={`mission-decision-status decision-${missionDecision.status
+      .toLowerCase()
+      .replace(/\s+/g, '-')}`}
+  >
+    <span>PRELIMINARY SITE DECISION</span>
+    <strong>{missionDecision.status}</strong>
+    <small>
+      {missionDecision.evaluatedCriteria}/{missionDecision.totalCriteria}
+      {' '}screening criteria evaluated
+    </small>
+  </div>
+
+  <div className="decision-intelligence-grid">
+    <div className="decision-intelligence-metric">
+      <span>DATA COVERAGE</span>
+      <strong>{missionDecision.coveragePercent}%</strong>
+    </div>
+
+    <div className="decision-intelligence-metric">
+      <span>CONFIDENCE</span>
+      <strong>{missionDecision.confidence}</strong>
+    </div>
+
+    <div className="decision-intelligence-metric">
+      <span>SCREENING SCORE</span>
+      <strong>
+        {missionDecision.score !== null
+          ? `${missionDecision.score}/100`
+          : 'N/A'}
+      </strong>
+    </div>
+  </div>
+
+  <div className="decision-explanation">
+    <strong>ENGINE EXPLANATION</strong>
+    <p>{missionDecision.explanation}</p>
+  </div>
+
+  {missionDecision.findings.length > 0 && (
+    <div className="decision-findings">
+      <strong>DECISION FINDINGS</strong>
+
+      {missionDecision.findings.map((finding, index) => (
+        <div
+          key={`${finding.category}-${index}`}
+          className={`decision-finding finding-${finding.severity.toLowerCase()}`}
+        >
+          <div className="decision-finding-heading">
+            <span>{finding.category}</span>
+            <small>{finding.severity}</small>
+          </div>
+
+          <p>{finding.message}</p>
+
+          {finding.value !== undefined && (
+            <small>
+              Observed: {finding.value}
+              {finding.threshold !== undefined &&
+                ` | Screening threshold: ${finding.threshold}`}
+            </small>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+
+  <div className="decision-disclaimer">
+    {missionDecision.disclaimer}
+  </div>
+
+
+<div className="resource-section-heading">
+  <span>05</span>
+  <h4>MISSION TRADE-OFF ANALYSIS</h4>
+</div>
+
+  <p className="tradeoff-intro">
+    Live assessment of the selected lunar landing coordinate.
+    Values are measurements or model outputs, not mission guarantees.
+  </p>
+
+  <div className="tradeoff-grid">
+    <div className="tradeoff-metric">
+      <span>Solar illumination</span>
+      <strong>
+        {illuminationAnalysis
+          ? `${illuminationAnalysis.illuminationPercent.toFixed(1)}%`
+          : 'UNAVAILABLE'}
+      </strong>
+      <small>Geometric model</small>
+    </div>
+
+    <div className="tradeoff-metric">
+      <span>Shadow duration</span>
+      <strong>
+        {illuminationAnalysis
+          ? `${illuminationAnalysis.shadowHours.toFixed(1)} h`
+          : 'UNAVAILABLE'}
+      </strong>
+      <small>Estimated</small>
+    </div>
+
+    <div className="tradeoff-metric">
+      <span>Terrain slope</span>
+      <strong>
+        {slopeSample?.status === 'available'
+          ? `${slopeSample.slopeDeg.toFixed(1)}°`
+          : 'UNAVAILABLE'}
+      </strong>
+      <small>LOLA-derived</small>
+    </div>
+
+    <div className="tradeoff-metric">
+      <span>Earth visibility</span>
+      <strong>
+        {communicationsAnalysis?.visibility ?? 'UNAVAILABLE'}
+      </strong>
+      <small>Geometric line of sight</small>
+    </div>
+
+    <div className="tradeoff-metric">
+      <span>Mapped PSR status</span>
+      <strong>
+        {resourceAssessment?.shadowStatus
+          .replace(/-/g, ' ')
+          .toUpperCase() ?? 'UNAVAILABLE'}
+      </strong>
+      <small>Polygon membership</small>
+    </div>
+
+    <div className="tradeoff-metric">
+      <span>Water-ice observations</span>
+      <strong>NOT INTEGRATED</strong>
+      <small>Orbital evidence unavailable</small>
+    </div>
+  </div>
+
+  <div className="tradeoff-warning">
+    <strong>ENGINE STATUS: PRELIMINARY</strong>
+    <p>
+      Power-system sizing, RF link budget, landing dispersion,
+      thermal survival and validated water-ice observations
+      are not yet included. No final landing approval is implied.
+    </p>
+  </div>
+
+</div>
+ 
+
+
     </>
   )}
 
@@ -2761,7 +3059,21 @@ useEffect(() => {
           ASSESSMENT: NOT EVALUATED
         </span>
 
-      </footer>
+            </footer>
+
+      {comparisonOpen && (
+        <SiteComparison
+  sites={comparisonSites}
+  simulationTime={simulationTime}
+  onClose={() => setComparisonOpen(false)}
+  onRemoveSite={(siteId) => {
+    setComparisonSites((current) =>
+      current.filter((site) => site.id !== siteId)
+    )
+  }}
+  assessShadow={comparisonShadowAssessor}
+/>
+      )}
 
     </main>
   )
