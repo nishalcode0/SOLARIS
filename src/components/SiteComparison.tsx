@@ -24,6 +24,7 @@ import {
 } from '../lib/lolaElevation'
 
 import { samplePSR, type PSRSample } from '../lib/lunarPSR'
+import MatplotlibComparison from './MatplotlibComparison'
 
 import {
   analyzeLunarIllumination,
@@ -102,145 +103,7 @@ function statusClass(status: string) {
   return status.toLowerCase().replaceAll(' ', '-')
 }
 
-/* -------------------------------------------------------
-   MULTI-SITE SOLAR ELEVATION CHART
-------------------------------------------------------- */
 
-function MultiSiteSolarChart({
-  results,
-}: {
-  results: SiteResult[]
-}) {
-  const available = results.filter(
-    (result) =>
-      result.illumination &&
-      result.illumination.samples.length >= 2,
-  )
-
-  if (available.length === 0) {
-    return (
-      <div className="compare-chart-empty">
-        Solar forecast unavailable
-      </div>
-    )
-  }
-
-  const width = 900
-  const height = 300
-  const left = 55
-  const right = 25
-  const top = 20
-  const bottom = 40
-
-  const plotWidth = width - left - right
-  const plotHeight = height - top - bottom
-
-  const colors = ['#e58b50', '#4c78a8', '#36a38a']
-
-  const y = (elevation: number) =>
-    top + ((90 - elevation) / 180) * plotHeight
-
-  const x = (index: number, count: number) =>
-    left + (index / (count - 1)) * plotWidth
-
-  return (
-    <div className="compare-chart-wrap">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="compare-chart"
-        role="img"
-        aria-label="Solar elevation comparison for all selected lunar sites"
-      >
-        {[-90, -60, -30, 0, 30, 60, 90].map((value) => (
-          <g key={value}>
-            <line
-              x1={left}
-              x2={width - right}
-              y1={y(value)}
-              y2={y(value)}
-              stroke="currentColor"
-              opacity={value === 0 ? 0.35 : 0.12}
-              strokeDasharray={value === 0 ? 'none' : '4 5'}
-            />
-
-            <text
-              x={left - 10}
-              y={y(value) + 4}
-              textAnchor="end"
-              fontSize="11"
-              fill="currentColor"
-            >
-              {value}°
-            </text>
-          </g>
-        ))}
-
-        {[0, 6, 12, 18, 24].map((hour) => (
-          <g key={hour}>
-            <line
-              x1={left + (hour / 24) * plotWidth}
-              x2={left + (hour / 24) * plotWidth}
-              y1={top}
-              y2={height - bottom}
-              stroke="currentColor"
-              opacity="0.08"
-            />
-
-            <text
-              x={left + (hour / 24) * plotWidth}
-              y={height - 12}
-              textAnchor="middle"
-              fontSize="11"
-              fill="currentColor"
-            >
-              {hour}h
-            </text>
-          </g>
-        ))}
-
-        {available.map((result, index) => {
-          const samples = result.illumination!.samples
-          const color = colors[index % colors.length]
-
-          const points = samples
-            .map((sample, sampleIndex) => {
-              const px = x(sampleIndex, samples.length)
-              const py = y(sample.solarElevationDeg)
-
-              return `${px},${py}`
-            })
-            .join(' ')
-
-          return (
-            <polyline
-              key={result.site.id}
-              points={points}
-              fill="none"
-              stroke={color}
-              strokeWidth="2.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )
-        })}
-      </svg>
-
-      <div className="compare-chart-legend">
-        {available.map((result, index) => (
-          <span key={result.site.id}>
-            <i
-              className="compare-legend-line"
-              style={{
-                backgroundColor: colors[index % colors.length],
-              }}
-            />
-            {result.site.name}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /* -------------------------------------------------------
    METRIC COMPONENT
@@ -484,6 +347,56 @@ export default function SiteComparison({
       active = false
     }
   }, [sites, simulationTime, assessShadow])
+
+    // Prepare measured and calculated results for the Python Matplotlib service.
+  const plotSites = useMemo(
+    () =>
+      results.map((result) => ({
+        name: result.site.name,
+
+        elevationM:
+          result.elevation.status === 'available'
+            ? result.elevation.elevationM
+            : null,
+
+        slopeDeg:
+          result.slope.status === 'available'
+            ? result.slope.slopeDeg
+            : null,
+
+        horizonBins: result.horizon?.bins ?? [],
+
+        illuminationSamples:
+          result.illumination?.samples.map((sample) => ({
+            timestamp: sample.timestamp,
+            solarElevationDeg: sample.solarElevationDeg,
+          })) ?? [],
+
+        illuminationPercent:
+          result.illumination?.illuminationPercent ?? null,
+
+        earthElevationDeg:
+          result.communications?.earthElevationDeg ?? null,
+
+        earthAzimuthDeg:
+          result.communications?.earthAzimuthDeg ?? null,
+
+        terrainClearanceDeg:
+          result.communications?.clearanceAngleDeg ?? null,
+
+        earthVisibility:
+          result.communications?.visibility ?? null,
+
+        psrStatus: result.shadowStatus,
+
+        decisionStatus: result.decision.status,
+
+        decisionScore: result.decision.score,
+
+        coveragePercent: result.decision.coveragePercent,
+      })),
+    [results],
+  )
 
   const activeResult = useMemo(
     () =>
@@ -897,21 +810,8 @@ export default function SiteComparison({
                 </div>
               </section>
 
-              <section className="compare-panel compare-chart-panel">
-                <div className="compare-panel-heading">
-                  <Activity size={17} />
-                  <h3>Solar elevation comparison</h3>
-                </div>
-
-                <MultiSiteSolarChart results={results} />
-
-                <p className="compare-chart-footnote">
-                  All selected sites are plotted on the same
-                  24-hour time axis. Values represent geometric
-                  solar elevation relative to the spherical
-                  reference horizon. Local terrain obstruction
-                  is not represented in these curves.
-                </p>
+                            <section className="compare-panel compare-chart-panel">
+                <MatplotlibComparison sites={plotSites} />
               </section>
 
               <section className="compare-panel compare-decision-panel">
