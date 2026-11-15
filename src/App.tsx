@@ -7,10 +7,19 @@ import {
 } from 'react'
 
 import LunarTerrain3D from './components/LunarTerrain3D'
-
 import MissionTimeController from './components/MissionTimeController'
-
 import HorizonIntelligence from './components/HorizonIntelligence'
+import { samplePSR } from './lib/lunarPSR'
+import type { PSRSample } from './lib/lunarPSR'
+
+
+import {
+  buildLunarResourceAssessment,
+} from './lib/lunarResources'
+
+import type {
+  LunarResourceAssessment,
+} from './types/lunarResources'
 
 import {
   calculateEarthVisibility,
@@ -20,12 +29,13 @@ import {
 import {
   analyzeLunarIllumination,
   calculateSolarPosition,
+  calculateTerrainVisibility,
   type LunarIlluminationAnalysis,
 } from './lib/lunarIllumination'
 
-
 import {
   sampleElevation,
+  projectedCoordinates,
   sampleSlope,
   sampleTerrainHorizon,
   type ElevationSample,
@@ -41,7 +51,7 @@ import type {
 import {
   Crosshair,
   Database,
-  Layers3, 
+  Layers3,
   Maximize2,
   Minus,
   Move3D,
@@ -51,6 +61,7 @@ import {
   X,
   Map as MapIcon,
 } from 'lucide-react'
+
 
 // --------------------------------------------------
 // TYPES
@@ -228,6 +239,112 @@ function isSite(selection: Selection): selection is Site {
 // MAIN APPLICATION
 // --------------------------------------------------
 
+type PSRPosition = [number, number]
+type PSRRing = PSRPosition[]
+type PSRPolygon = PSRRing[]
+
+type PSRFeature = {
+  type: 'Feature'
+  geometry:
+    | {
+        type: 'Polygon'
+        coordinates: PSRPolygon
+      }
+    | {
+        type: 'MultiPolygon'
+        coordinates: PSRPolygon[]
+      }
+  properties: {
+    gid: string
+    area_km2: string
+    name: string
+  }
+}
+
+type PSRShadowResult =
+  | 'inside-mapped-psr'
+  | 'outside-mapped-psr'
+  | 'insufficient-data'
+
+function pointInRing(
+  x: number,
+  y: number,
+  ring: PSRPosition[],
+): boolean {
+  let inside = false
+
+  for (
+    let i = 0, j = ring.length - 1;
+    i < ring.length;
+    j = i++
+  ) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+
+    const intersects =
+      (yi > y) !== (yj > y) &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+
+    if (intersects) inside = !inside
+  }
+
+  return inside
+}
+
+function pointInPolygon(
+  x: number,
+  y: number,
+  polygon: PSRPolygon,
+): boolean {
+  const [outerRing, ...holes] = polygon
+
+  if (!outerRing || !pointInRing(x, y, outerRing)) {
+    return false
+  }
+
+  return !holes.some(hole => pointInRing(x, y, hole))
+}
+
+function assessMappedPSR(
+  latitude: number,
+  longitude: number,
+  features: PSRFeature[],
+): PSRShadowResult {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > -80 ||
+    longitude < -180 ||
+    longitude > 180 ||
+    features.length === 0
+  ) {
+    return 'insufficient-data'
+  }
+
+  const { x, y, rho } = projectedCoordinates(
+    latitude,
+    longitude,
+  )
+
+  if (rho > 304000) return 'insufficient-data'
+
+  for (const feature of features) {
+    const polygons: PSRPolygon[] =
+      feature.geometry.type === 'Polygon'
+        ? [feature.geometry.coordinates]
+        : feature.geometry.coordinates
+
+    for (const polygon of polygons) {
+      if (pointInPolygon(x, y, polygon)) {
+        return 'inside-mapped-psr'
+      }
+    }
+  }
+
+  return 'outside-mapped-psr'
+}
+
 export default function App() {
   // Location workflow:
   // pendingSite = temporary popup selection
@@ -323,6 +440,37 @@ export default function App() {
   const [communicationsError, setCommunicationsError] =
     useState<string | null>(null)
 
+  const [resourceAssessment, setResourceAssessment] =
+    useState<LunarResourceAssessment | null>(null)
+
+  const [resourceError, setResourceError] =
+    useState<string | null>(null)
+
+  const [psrOn, setPsrOn] = useState(false)
+const [psrFeatures, setPsrFeatures] = useState<PSRFeature[]>([])
+const [psrError, setPsrError] = useState(false)
+
+useEffect(() => {
+  let active = true
+
+  fetch('/data/lunar-psr-display.geojson')
+    .then(response => {
+      if (!response.ok) throw new Error('PSR data unavailable')
+      return response.json()
+    })
+    .then(data => {
+      if (active) setPsrFeatures(data.features ?? [])
+    })
+    .catch(error => {
+      console.error('PSR overlay loading failed:', error)
+      if (active) setPsrError(true)
+    })
+
+  return () => {
+    active = false
+  }
+}, [])
+
   // Refs
 
   const viewportRef =
@@ -365,6 +513,14 @@ const liveSolarPosition = useMemo(() => {
   )
 }, [selectedSite, simulationTime])
 
+const liveTerrainVisibility = useMemo(() => {
+  if (!liveSolarPosition || !terrainHorizon) return null
+
+  return calculateTerrainVisibility(
+    liveSolarPosition,
+    terrainHorizon,
+  )
+}, [liveSolarPosition, terrainHorizon])
   // --------------------------------------------------
 // NASA LOLA ELEVATION SAMPLING
 // --------------------------------------------------
@@ -375,6 +531,7 @@ const liveSolarPosition = useMemo(() => {
   // --------------------------------------------------
 // UNIFIED LOCATION ANALYSIS PIPELINE
 // --------------------------------------------------
+
 
 useEffect(() => {
   if (!selectedSite) {
@@ -390,13 +547,12 @@ useEffect(() => {
     setHorizonError(null)
     setHorizonLoading(false)
 
-    setIlluminationAnalysis(null)
-    setIlluminationError(null)
-    setIlluminationLoading(false)
-
     setCommunicationsAnalysis(null)
     setCommunicationsError(null)
     setCommunicationsLoading(false)
+
+    setResourceAssessment(null)
+    setResourceError(null)
 
     return
   }
@@ -404,18 +560,16 @@ useEffect(() => {
   const latitude = selectedSite.latitude
   const longitude = selectedSite.longitude
 
-  console.log('SOLARIS COMMUNICATIONS INPUT:', {
-  latitude,
-  longitude,
-  latitudeType: typeof latitude,
-  longitudeType: typeof longitude,
-  latitudeFinite: Number.isFinite(latitude),
-  longitudeFinite: Number.isFinite(longitude),
-})
+  console.log('SOLARIS LOCATION INPUT:', {
+    latitude,
+    longitude,
+    latitudeFinite: Number.isFinite(latitude),
+    longitudeFinite: Number.isFinite(longitude),
+  })
 
   let active = true
 
-  // Reset previous location's results.
+  // Reset results from the previous location.
   setElevationSample(null)
   setElevationError(null)
   setElevationLoading(true)
@@ -428,26 +582,20 @@ useEffect(() => {
   setHorizonError(null)
   setHorizonLoading(true)
 
-  setIlluminationAnalysis(null)
-  setIlluminationError(null)
-  setIlluminationLoading(true)
+  setCommunicationsAnalysis(null)
+  setCommunicationsError(null)
+  setCommunicationsLoading(true)
+
+  setResourceAssessment(null)
+  setResourceError(null)
 
   async function runLocationAnalysis() {
     const results = await Promise.allSettled([
-      sampleElevation(latitude, longitude),
-
-      sampleSlope(latitude, longitude),
-
-      sampleTerrainHorizon(latitude, longitude),
-
-      Promise.resolve().then(() =>
-        analyzeLunarIllumination(
-          latitude,
-          longitude,
-          simulationTime,
-        ),
-      ),
-    ])
+    sampleElevation(latitude, longitude),
+    sampleSlope(latitude, longitude),
+    sampleTerrainHorizon(latitude, longitude),
+    samplePSR(latitude, longitude),
+  ])
 
     if (!active) return
 
@@ -492,57 +640,113 @@ useEffect(() => {
     setSlopeLoading(false)
 
     // 3. DEM terrain horizon
-const horizonResult = results[2]
+    const horizonResult = results[2]
 
-if (horizonResult.status === 'fulfilled') {
-  const horizonProfile = horizonResult.value
+    let horizonProfile = null
 
-  setTerrainHorizon(horizonProfile)
+    if (horizonResult.status === 'fulfilled') {
+      horizonProfile = horizonResult.value
 
-  // 4. Earth line-of-sight analysis
-  try {
-    const communications =
-      calculateEarthVisibility(
-        latitude,
-        longitude,
-        horizonProfile,
-        new Date(),
+      setTerrainHorizon(horizonProfile)
+
+      // 4. Earth line-of-sight analysis
+      try {
+        const communications = calculateEarthVisibility(
+          latitude,
+          longitude,
+          horizonProfile,
+          new Date(),
+        )
+
+        if (active) {
+          setCommunicationsAnalysis(communications)
+        }
+      } catch (error) {
+        console.error(
+          'Earth visibility calculation failed:',
+          error,
+        )
+
+        if (active) {
+          setCommunicationsError(
+            error instanceof Error
+              ? error.message
+              : 'Unknown communications calculation error',
+          )
+        }
+      }
+    } else {
+      console.error(
+        'NASA LOLA horizon analysis failed:',
+        horizonResult.reason,
       )
 
-    setCommunicationsAnalysis(communications)
-  } catch (error) {
-    console.error(
-      'Earth visibility calculation failed:',
-      error,
-    )
+      setHorizonError(
+        horizonResult.reason instanceof Error
+          ? horizonResult.reason.message
+          : 'Unknown terrain horizon error',
+      )
 
-    setCommunicationsError(
-      error instanceof Error
-        ? error.message
-        : 'Unknown communications calculation error',
-    )
-  }
+      setCommunicationsError(
+        'Earth visibility unavailable because terrain horizon data could not be calculated.',
+      )
+    }
+
+    setHorizonLoading(false)
+    setCommunicationsLoading(false)
+
+    // 4. NASA LOLA PSR raster
+const psrResult = results[3]
+
+let psrSample: PSRSample
+
+if (psrResult.status === 'fulfilled') {
+  psrSample = psrResult.value
 } else {
-  console.error(
-    'NASA LOLA horizon analysis failed:',
-    horizonResult.reason,
-  )
-
-  setHorizonError(
-    horizonResult.reason instanceof Error
-      ? horizonResult.reason.message
-      : 'Unknown terrain horizon error',
-  )
-
-  setCommunicationsError(
-    'Earth visibility unavailable because terrain horizon data could not be calculated.',
-  )
+  console.error('NASA LOLA PSR sampling failed:', psrResult.reason)
+  psrSample = { status: 'unavailable' }
 }
 
-setHorizonLoading(false)
-setCommunicationsLoading(false)
+    // 5. Lunar Resource Intelligence
+    if (
+      elevationResult.status === 'fulfilled' &&
+      slopeResult.status === 'fulfilled'
+    ) {
+      try {
+        const assessment = buildLunarResourceAssessment(
+  latitude,
+  longitude,
+  elevationResult.value,
+  slopeResult.value,
+  horizonProfile,
+  psrSample,
+  assessMappedPSR(latitude, longitude, psrFeatures),
+)
 
-    
+        if (active) {
+          setResourceAssessment(assessment)
+          setResourceError(null)
+        }
+      } catch (error) {
+        console.error(
+          'Lunar resource assessment failed:',
+          error,
+        )
+
+        if (active) {
+          setResourceAssessment(null)
+          setResourceError(
+            error instanceof Error
+              ? error.message
+              : 'Unknown resource assessment error',
+          )
+        }
+      }
+    } else {
+      setResourceError(
+        'Resource assessment unavailable because elevation or slope data could not be calculated.',
+      )
+    }
   }
 
   runLocationAnalysis().catch((error: unknown) => {
@@ -556,13 +760,12 @@ setCommunicationsLoading(false)
     setElevationError('Location analysis failed')
     setSlopeError('Location analysis failed')
     setHorizonError('Location analysis failed')
-    setIlluminationError('Location analysis failed')
     setCommunicationsError('Location analysis failed')
+    setResourceError('Location analysis failed')
 
     setElevationLoading(false)
     setSlopeLoading(false)
     setHorizonLoading(false)
-    setIlluminationLoading(false)
     setCommunicationsLoading(false)
   })
 
@@ -570,7 +773,10 @@ setCommunicationsLoading(false)
     active = false
   }
 }, [selectedSite])
+
+
 // TIME-DEPENDENT LUNAR ILLUMINATION
+
 useEffect(() => {
   if (!selectedSite) {
     setIlluminationAnalysis(null)
@@ -934,6 +1140,53 @@ useEffect(() => {
     alt="Estimated lunar terrain illumination and shadow heatmap"
     draggable={false}
   />
+)}
+
+{/* NASA MAPPED PSR POLYGONS */}
+
+{psrOn && psrFeatures.length > 0 && (
+  <svg
+    className="psr-overlay"
+    viewBox={`0 0 ${2 * VIEW_RADIUS_M} ${2 * VIEW_RADIUS_M}`}
+    preserveAspectRatio="none"
+  >
+    <defs>
+  <clipPath id="psr-coverage-clip">
+    <circle
+      cx={VIEW_RADIUS_M}
+      cy={VIEW_RADIUS_M}
+      r={304000}
+    />
+  </clipPath>
+</defs>
+
+<g clipPath="url(#psr-coverage-clip)">
+    {psrFeatures.map(feature => {
+      const polygons =
+        feature.geometry.type === 'Polygon'
+          ? [feature.geometry.coordinates]
+          : feature.geometry.coordinates
+
+      return polygons.map((polygon, polygonIndex) => {
+        const outerRing = polygon[0]
+
+        const points = outerRing
+          .map(([x, y]) =>
+            `${x + VIEW_RADIUS_M},${VIEW_RADIUS_M - y}`
+          )
+          .join(' ')
+
+        return (
+          <polygon
+            key={`${feature.properties.gid}-${polygonIndex}`}
+            points={points}
+            className="psr-polygon"
+          />
+        )
+      })
+    })}
+    </g>
+  </svg>
 )}
 
   {slopeHeatmapOn && (
@@ -1319,53 +1572,41 @@ useEffect(() => {
 
           </div>
         
+       
         ) : (
-  <div
-    className="map-viewport terrain-3d-viewport"
-    style={{
-      position: 'relative',
-      height: '100%',
-      minHeight: '600px',
-      overflow: 'hidden',
-    }}
-  >
-    {terrainFocus && (
-      <LunarTerrain3D
-        latitude={terrainFocus.latitude}
-        longitude={terrainFocus.longitude}
-        simulationTime={simulationTime}
-      />
-    )}
+          <div className="map-viewport terrain-3d-viewport">
 
-    {/* MIDDLE-LEFT MISSION TIME CONTROLLER */}
-    {selectedSite && (
-      <div
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '0',
-          transform: 'translateY(-50%)',
-          zIndex: 999,
-          width: '280px',
-          maxWidth: 'calc(100% - 16px)',
-        }}
-      >
-        <MissionTimeController
-          simulationTime={simulationTime}
-          onTimeChange={setSimulationTime}
-          compact
-        />
-      </div>
-    )}
+            {/* 3D LUNAR TERRAIN */}
+            {terrainFocus && (
+              <LunarTerrain3D
+                latitude={terrainFocus.latitude}
+                longitude={terrainFocus.longitude}
+                simulationTime={simulationTime}
+              />
+            )}
 
-    <button
-      className="terrain-exit-button"
-      onClick={() => setViewMode('2d')}
-    >
-      ← 2D MAP
-    </button>
-  </div>
-)}
+            {/* MIDDLE-LEFT MISSION TIME CONTROLLER */}
+            {selectedSite && (
+              <div className="mission-time-overlay">
+                <MissionTimeController
+                  simulationTime={simulationTime}
+                  onTimeChange={setSimulationTime}
+                  compact
+                />
+              </div>
+            )}
+
+            {/* RETURN TO 2D MAP */}
+            <button
+              className="terrain-exit-button"
+              onClick={() => setViewMode('2d')}
+            >
+              ← 2D MAP
+            </button>
+
+          </div>
+        )}
+
         {/* ========================================
             LEFT MAP SIDEBAR
         ======================================== */}
@@ -1425,6 +1666,24 @@ useEffect(() => {
     }
   />
 </label>
+<label className="layer-row">
+  <span>
+    <i className="layer-swatch psr" />
+    Mapped PSRs (&gt;1 km²)
+  </span>
+
+  <input
+    type="checkbox"
+    checked={psrOn}
+    onChange={event => setPsrOn(event.target.checked)}
+  />
+</label>
+
+{psrError && (
+  <small className="layer-error">
+    PSR DATA UNAVAILABLE
+  </small>
+)}
 
             <label className="layer-row">
 
@@ -2033,6 +2292,345 @@ useEffect(() => {
 
 </section>
 
+{/* ==========================================
+    LUNAR RESOURCE INTELLIGENCE
+========================================== */}
+
+<section className="resource-panel">
+
+  <div className="resource-header">
+    <div>
+      <span className="section-eyebrow">RESOURCE PROSPECTING</span>
+      <h3>Lunar Resource Intelligence</h3>
+      <p className="resource-subtitle">
+        Scientific assessment of the selected lunar coordinates
+      </p>
+    </div>
+
+    <span className="data-status">
+      {resourceError
+        ? 'ERROR'
+        : resourceAssessment
+          ? 'ASSESSMENT AVAILABLE'
+          : 'AWAITING DATA'}
+    </span>
+  </div>
+
+  {!resourceAssessment && !resourceError && (
+    <p>Select a lunar location to calculate its resource assessment.</p>
+  )}
+
+  {resourceError && (
+    <p className="resource-error">{resourceError}</p>
+  )}
+
+  {resourceAssessment && (
+    <div className="resource-content">
+
+      {/* PRIMARY ASSESSMENT */}
+
+      <div className="resource-overview">
+        <span className="resource-overview-label">
+          MAPPED PERMANENTLY SHADOWED REGION
+        </span>
+
+        <h4>
+          {resourceAssessment.shadowStatus === 'inside-mapped-psr'
+            ? 'Inside mapped PSR'
+            : resourceAssessment.shadowStatus === 'outside-mapped-psr'
+              ? 'Outside mapped PSR'
+              : 'PSR classification unavailable'}
+        </h4>
+
+        <p>
+          {resourceAssessment.shadowStatus === 'inside-mapped-psr'
+            ? 'The selected coordinate falls within a mapped NASA permanently shadowed region polygon.'
+            : resourceAssessment.shadowStatus === 'outside-mapped-psr'
+              ? 'The coordinate is outside the supplied mapped PSR boundaries. This does not establish that the location is currently sunlit.'
+              : 'Mapped PSR boundaries are unavailable or the selected coordinate cannot be assessed.'}
+        </p>
+      </div>
+
+      {/* SUMMARY METRICS */}
+
+      <div className="resource-section">
+        <div className="resource-section-heading">
+          <span>01</span>
+          <h4>RESOURCE SUMMARY</h4>
+        </div>
+
+        <div className="resource-summary-grid">
+
+          <div className="resource-card">
+            <span>Water-ice evidence</span>
+            <strong>{resourceAssessment.waterIce.status.toUpperCase()}</strong>
+          </div>
+
+          <div className="resource-card">
+            <span>Evidence confidence</span>
+            <strong>{resourceAssessment.waterIce.confidence.toUpperCase()}</strong>
+          </div>
+
+          <div className="resource-card">
+            <span>Terrain data</span>
+            <strong>
+              {resourceAssessment.dataCoverage.terrain
+                ? 'AVAILABLE'
+                : 'UNAVAILABLE'}
+            </strong>
+          </div>
+
+          <div className="resource-card">
+            <span>PSR polygon data</span>
+            <strong>
+              {resourceAssessment.dataCoverage.psr
+                ? 'AVAILABLE'
+                : 'UNAVAILABLE'}
+            </strong>
+          </div>
+
+        </div>
+      </div>
+
+      {/* LIVE SHADOW ANALYSIS */}
+
+      <div className="resource-section">
+        <div className="resource-section-heading">
+          <span>02</span>
+          <h4>LIVE SHADOW ANALYSIS</h4>
+          <span className="resource-live-tag">SIMULATION TIME</span>
+        </div>
+
+        <div className="resource-shadow-card">
+
+          <div className="resource-shadow-status">
+            <span>Terrain visibility</span>
+            <strong>
+              {liveTerrainVisibility?.status === 'blocked-estimate'
+                ? 'TERRAIN-SHADOWED'
+                : liveTerrainVisibility?.status === 'visible-estimate'
+                  ? 'SUN ABOVE LOCAL HORIZON'
+                  : 'UNCERTAIN'}
+            </strong>
+          </div>
+
+          <div className="resource-shadow-grid">
+
+            <div>
+              <span>Solar elevation</span>
+              <strong>
+                {liveTerrainVisibility &&
+                liveTerrainVisibility.status !== 'uncertain'
+                  ? `${liveTerrainVisibility.solarElevationDeg.toFixed(2)}°`
+                  : '--'}
+              </strong>
+            </div>
+
+            <div>
+              <span>Terrain horizon</span>
+              <strong>
+                {liveTerrainVisibility &&
+                liveTerrainVisibility.status !== 'uncertain'
+                  ? `${liveTerrainVisibility.terrainHorizonDeg.toFixed(2)}°`
+                  : '--'}
+              </strong>
+            </div>
+
+            <div>
+              <span>Solar clearance</span>
+              <strong>
+                {liveTerrainVisibility &&
+                liveTerrainVisibility.status !== 'uncertain'
+                  ? `${liveTerrainVisibility.clearanceDeg.toFixed(2)}°`
+                  : '--'}
+              </strong>
+            </div>
+
+          </div>
+
+          <p>
+            {liveTerrainVisibility?.status === 'blocked-estimate'
+              ? 'The calculated local terrain horizon is above the Sun at the selected simulation time. Terrain obstruction is estimated.'
+              : liveTerrainVisibility?.status === 'visible-estimate'
+                ? 'The Sun is above the calculated local terrain horizon at the selected simulation time.'
+                : 'Terrain visibility cannot currently be determined from the available horizon samples.'}
+          </p>
+
+          <div className="resource-note">
+            Time-specific geometric estimate using NASA LOLA terrain.
+            Not proof of permanent shadow or water-ice presence.
+          </div>
+
+        </div>
+      </div>
+
+      {/* PSR DATA */}
+
+      <div className="resource-section">
+        <div className="resource-section-heading">
+          <span>03</span>
+          <h4>NASA PSR DATA</h4>
+        </div>
+
+        <div className="resource-data-list">
+
+          <div>
+            <span>Raster sample</span>
+            <strong>
+              {resourceAssessment.psr.status === 'available'
+                ? 'AVAILABLE'
+                : resourceAssessment.psr.status === 'outside-coverage'
+                  ? 'OUTSIDE COVERAGE'
+                  : resourceAssessment.psr.status === 'no-data'
+                    ? 'NO DATA'
+                    : resourceAssessment.psr.status === 'invalid-value'
+                      ? 'INVALID VALUE'
+                      : 'UNAVAILABLE'}
+            </strong>
+          </div>
+
+          <div>
+            <span>Raw mask value</span>
+            <strong>
+              {resourceAssessment.psr.status === 'available'
+                ? resourceAssessment.psr.maskValue
+                : resourceAssessment.psr.status === 'invalid-value'
+                  ? resourceAssessment.psr.value
+                  : 'NOT AVAILABLE'}
+            </strong>
+          </div>
+
+          <div>
+            <span>Spatial resolution</span>
+            <strong>
+              {resourceAssessment.psr.status === 'available'
+                ? `${resourceAssessment.psr.pixelSpacingM} m / pixel`
+                : 'NOT AVAILABLE'}
+            </strong>
+          </div>
+
+          <div>
+            <span>Raster pixel coordinates</span>
+            <strong>
+              {resourceAssessment.psr.status === 'available'
+                ? `${resourceAssessment.psr.pixelColumn}, ${resourceAssessment.psr.pixelRow}`
+                : 'NOT AVAILABLE'}
+            </strong>
+          </div>
+
+          <div>
+            <span>Raster coverage</span>
+            <strong>
+              {resourceAssessment.dataCoverage.psr
+                ? 'AVAILABLE'
+                : 'UNAVAILABLE'}
+            </strong>
+          </div>
+
+          {resourceAssessment.psr.status === 'available' && (
+            <div>
+              <span>Data source</span>
+              <strong>{resourceAssessment.psr.source}</strong>
+            </div>
+          )}
+
+        </div>
+
+        <div className="resource-note">
+          The raster's binary encoding has not been independently
+          verified. Raw values are displayed without interpreting
+          them as confirmed PSR membership.
+        </div>
+      </div>
+
+      {/* WATER ICE OBSERVATIONS */}
+
+      <div className="resource-section">
+        <div className="resource-section-heading">
+          <span>04</span>
+          <h4>WATER-ICE OBSERVATIONS</h4>
+        </div>
+
+        <div className="resource-observation-grid">
+
+          <div className="resource-observation-card">
+            <span className="resource-observation-icon">H</span>
+            <div>
+              <span>Hydrogen evidence</span>
+              <strong>
+                {resourceAssessment.waterIce.hydrogenEvidence
+                  .replace(/-/g, ' ')
+                  .toUpperCase()}
+              </strong>
+            </div>
+          </div>
+
+          <div className="resource-observation-card">
+            <span className="resource-observation-icon">T</span>
+            <div>
+              <span>Thermal evidence</span>
+              <strong>
+                {resourceAssessment.waterIce.thermalEvidence
+                  .replace(/-/g, ' ')
+                  .toUpperCase()}
+              </strong>
+            </div>
+          </div>
+
+          <div className="resource-observation-card">
+            <span className="resource-observation-icon">R</span>
+            <div>
+              <span>Radar evidence</span>
+              <strong>
+                {resourceAssessment.waterIce.radarEvidence
+                  .replace(/-/g, ' ')
+                  .toUpperCase()}
+              </strong>
+            </div>
+          </div>
+
+          <div className="resource-observation-card">
+            <span className="resource-observation-icon">D</span>
+            <div>
+              <span>Terrain horizon</span>
+              <strong>
+                {resourceAssessment.dataCoverage.horizon
+                  ? 'AVAILABLE'
+                  : 'UNAVAILABLE'}
+              </strong>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="resource-explanation">
+          {resourceAssessment.waterIce.explanation}
+        </div>
+      </div>
+
+      {/* METHODOLOGY */}
+
+      <div className="resource-methodology">
+        <span>METHODOLOGY & PROVENANCE</span>
+        <p>{resourceAssessment.methodology}</p>
+      </div>
+
+    </div>
+  )}
+
+  <div className="resource-disclaimer">
+    <strong>SCIENTIFIC LIMITATION</strong>
+    <p>
+      Shadow conditions alone do not establish water-ice presence.
+      PSR raster values are displayed as raw data because their
+      binary encoding has not been independently verified.
+      Validated orbital observations are required to establish
+      water-ice evidence.
+    </p>
+  </div>
+
+</section>
+
               {[
                 [
   '01',
@@ -2069,10 +2667,14 @@ useEffect(() => {
                   'DATA UNAVAILABLE',
                 ],
                 [
-                  '05',
-                  'Lunar resources',
-                  'DATA UNAVAILABLE',
-                ],
+  '05',
+  'Lunar resources',
+  resourceError
+    ? 'ASSESSMENT ERROR'
+    : resourceAssessment
+      ? resourceAssessment.waterIce.status.toUpperCase()
+      : 'AWAITING ASSESSMENT',
+],
               ].map(([number, title, status]) => (
                 <div
                   className="report-row"

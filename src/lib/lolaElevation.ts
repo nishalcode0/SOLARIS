@@ -54,7 +54,7 @@ function getElevationImage() {
   return imagePromise
 }
 
-function projectedCoordinates(latitude: number, longitude: number) {
+export function projectedCoordinates(latitude: number, longitude: number) {
   const latitudeRadians = latitude * Math.PI / 180
   const longitudeRadians = longitude * Math.PI / 180
 
