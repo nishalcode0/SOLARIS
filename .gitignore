@@ -21,3 +21,11 @@ __pycache__/
 
 # Logs
 *.log
+
+# Large source rasters and source shapefiles (host separately)
+public/data/LDEM_80S_80MPP_ADJ.TIF
+public/data/LDEM_80S_80MPP_ADJ.TIF.aux.xml
+public/data/LPSR_80S_20MPP_ADJ.TIF
+public/data/LPSR_80S_20MPP_ADJ.SHP
+public/data/LPSR_80S_20MPP_ADJ_1km2.*
+public/data/lunar-psr.geojson

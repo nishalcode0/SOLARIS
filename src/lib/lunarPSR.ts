@@ -2,7 +2,8 @@
 import { fromUrl } from 'geotiff'
 import { projectedCoordinates } from './lolaElevation'
 
-const PSR_TIFF_URL = '/data/LPSR_80S_20MPP_ADJ.TIF'
+const DATA_BASE_URL = (import.meta.env.VITE_DATA_BASE_URL || '').replace(/\/$/, '')
+const PSR_TIFF_URL = `${DATA_BASE_URL}/data/LPSR_80S_20MPP_ADJ.TIF`
 
 const PIXEL_SIZE_M = 20
 const RASTER_ORIGIN_X = -304_000

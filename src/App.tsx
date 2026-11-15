@@ -15,6 +15,10 @@ import type { PSRSample } from './lib/lunarPSR'
 import { evaluateMissionDecision } from './lib/missionDecision'
 import SiteComparison from './components/SiteComparison'
 
+const DATA_BASE_URL = (import.meta.env.VITE_DATA_BASE_URL || '').replace(/\/$/, '')
+const dataUrl = (path: string) => `${DATA_BASE_URL}/data/${path}`
+
+
 
 import {
   buildLunarResourceAssessment,
@@ -468,7 +472,7 @@ const [psrError, setPsrError] = useState(false)
 useEffect(() => {
   let active = true
 
-  fetch('/data/lunar-psr-display.geojson')
+  fetch(dataUrl('lunar-psr-display.geojson'))
     .then(response => {
       if (!response.ok) throw new Error('PSR data unavailable')
       return response.json()
@@ -1204,7 +1208,7 @@ function startComparison() {
               {hillshadeOn && !mapMissing && (
                 <img
                   className="hillshade-raster"
-                  src="/data/lola-south-pole-hillshade.png?v=2"
+                  src={`${dataUrl("lola-south-pole-hillshade.png")}?v=2`}
                   alt="NASA LOLA south polar hillshade, 80 degrees south to the pole"
                   onLoad={() => setMapReady(true)}
                   onError={() => setMapMissing(true)}
@@ -1223,7 +1227,7 @@ function startComparison() {
 {slopeHeatmapOn && (
   <img
     className="slope-heatmap-raster"
-    src="/data/lola-south-pole-slope.png"
+    src={dataUrl("lola-south-pole-slope.png")}
     alt="NASA LOLA derived south polar terrain slope heatmap"
     draggable={false}
   />
@@ -1231,7 +1235,7 @@ function startComparison() {
 {illuminationHeatmapOn && (
   <img
     className="illumination-heatmap-raster"
-    src="/data/lola-south-pole-illumination.png"
+    src={dataUrl("lola-south-pole-illumination.png")}
     alt="Estimated lunar terrain illumination and shadow heatmap"
     draggable={false}
   />

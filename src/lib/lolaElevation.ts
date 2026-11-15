@@ -1,7 +1,8 @@
 
 import { fromUrl } from 'geotiff'
 
-const TIFF_URL = '/data/LDEM_80S_80MPP_ADJ.TIF'
+const DATA_BASE_URL = (import.meta.env.VITE_DATA_BASE_URL || '').replace(/\/$/, '')
+const TIFF_URL = `${DATA_BASE_URL}/data/LDEM_80S_80MPP_ADJ.TIF`
 
 const MOON_RADIUS_M = 1_737_400
 const PIXEL_SIZE_M = 80
