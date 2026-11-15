@@ -1465,7 +1465,23 @@ function startComparison() {
                     <span>{site.name}</span>
                   </button>
                 ))}
+                              {/* USER-ADDED LANDING SITE MARKERS */}
 
+              {comparisonSites.map((site) => (
+                <button
+                  key={`comparison-${site.id}`}
+                  className="comparison-site-marker"
+                  style={project(
+                    site.latitude,
+                    site.longitude,
+                  )}
+                  onClick={() => openCandidate(site)}
+                  title={site.name}
+                  aria-label={`Inspect added site ${site.name}`}
+                >
+                  <i />
+                </button>
+              ))}
               {/* TEMPORARY LOCATION MARKER */}
 
               {pendingPoint && (

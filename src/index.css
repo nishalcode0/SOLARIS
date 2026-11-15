@@ -4553,3 +4553,48 @@ input:focus-visible {
   background: #c94d43;
   color: white;
 }
+/* =========================================
+   SOLARIS — USER-ADDED LANDING SITE MARKERS
+========================================= */
+
+.comparison-site-marker {
+  position: absolute;
+  z-index: 5;
+
+  width: 20px;
+  height: 20px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 1.5px solid #e34b43;
+  border-radius: 50%;
+
+  background: rgba(227, 75, 67, 0.16);
+
+  transform:
+    translate(-50%, -50%)
+    scale(var(--inverse-zoom, 1));
+
+  cursor: pointer;
+
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75);
+}
+
+.comparison-site-marker i {
+  display: block;
+
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #e34b43;
+}
+
+.comparison-site-marker:hover {
+  background: rgba(227, 75, 67, 0.32);
+  border-color: #b82e28;
+}
